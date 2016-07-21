@@ -6,9 +6,9 @@
  * Vestibulum commodo. Ut rhoncus gravida arcu.
  ******************************************************************************/
 
-package com.dishonest;
+package com.dishonest.handler;
 
-import com.dishonest.dao.TestConn;
+import com.dishonest.dao.ConnUtil;
 import com.dishonest.util.CheckNumber;
 import com.dishonest.util.HttpUtil;
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
@@ -34,14 +34,14 @@ import java.util.*;
  * User: zhangkl
  * Date: 七月,2016
  */
-public class TestProxy implements Runnable {
+public class ProxyHandler implements Runnable {
 
     private int sendtimes = 0;
     private int maxtimes = 5;
 
     public static void main(String[] args) {
         try {
-            getProxy("http://www.youdaili.net/Daili/http/4722.html");
+            getProxy("http://www.youdaili.net/Daili/guonei/4733.html");
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -57,15 +57,17 @@ public class TestProxy implements Runnable {
         System.out.println(nodes.asString());
         String[] strings = nodes.asString().split("\n");
         for (int i = 0; i < strings.length - 5; i++) {
-            System.out.println(i + ":" + strings[i].split("@")[0]);
-            try {
-                TestConn.getInstance().executeSaveOrUpdate("insert into cred_dishonesty_proxy (proxyurl,dgetdata,isusered) values ('" + strings[i].split("@")[0] + "',sysdate,0)");
-            } catch (SQLException e) {
-                if (e.getMessage().contains("ORA-00001: 违反唯一约束条件 (CRED.PK_PROXY)")) {
-                    System.out.println(e.getMessage());
-                    continue;
-                } else {
-                    e.printStackTrace();
+            if (strings[i].contains("@")){
+                System.out.println(i + ":" + strings[i].split("@")[0]);
+                try {
+                    ConnUtil.getInstance().executeSaveOrUpdate("insert into cred_dishonesty_proxy (proxyurl,dgetdata,isusered) values ('" + strings[i].split("@")[0] + "',sysdate,0)");
+                } catch (SQLException e) {
+                    if (e.getMessage().contains("ORA-00001: 违反唯一约束条件 (CRED.PK_PROXY)")) {
+                        System.out.println(e.getMessage());
+                        continue;
+                    } else {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
@@ -140,8 +142,8 @@ public class TestProxy implements Runnable {
 
     public static void getAccount() throws InterruptedException, IOException, SQLException {
         HttpUtil httpUtil = new HttpUtil();
-        TestConn testConn = TestConn.getInstance();
-        List list = testConn.executeQueryForList("select * from cred_dishonesty_log");
+        ConnUtil connUtil = ConnUtil.getInstance();
+        List list = connUtil.executeQueryForList("select * from cred_dishonesty_log");
         Iterator it = list.iterator();
         while (it.hasNext()) {
             Map map = (Map) it.next();

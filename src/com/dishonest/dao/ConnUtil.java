@@ -16,7 +16,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class TestConn {
+public class ConnUtil {
 
     //几个数据库变量
     //dbUrl数据库连接串信息，其中“1521”为端口，“ora9”为sid
@@ -28,7 +28,7 @@ public class TestConn {
     ConnectionPool conPool;
 
     //初始化连接
-    private TestConn() {
+    private ConnUtil() {
         try {
             conPool = new ConnectionPool("oracle.jdbc.driver.OracleDriver", dbUrl, theUser, thePw, 50);
         } catch (Exception e) {
@@ -36,12 +36,12 @@ public class TestConn {
         }
     }
 
-    public static TestConn getInstance() {
-        return SingletonFactory.testConn;
+    public static ConnUtil getInstance() {
+        return SingletonFactory.connUtil;
     }
 
     public static void main(String[] args) throws SQLException {
-        Map map = TestConn.getInstance().executeQueryForMap("select * from cred_dishonesty_proxy where isusered = 1");
+        Map map = ConnUtil.getInstance().executeQueryForMap("select * from cred_dishonesty_proxy where isusered = 1");
         System.out.println(map == null);
     }
 
@@ -165,9 +165,7 @@ public class TestConn {
                 }
             }
             ps.execute();
-        } catch (SQLException e) {
-            e.printStackTrace();
-
+            connection.commit();
         } finally {
             if (ps != null) {
                 ps.close();
@@ -197,6 +195,6 @@ public class TestConn {
     }
 
     private static class SingletonFactory {
-        private static TestConn testConn = new TestConn();
+        private static ConnUtil connUtil = new ConnUtil();
     }
 }

@@ -1,7 +1,8 @@
 package com;
 
-import com.dishonest.TestNum;
-import com.dishonest.dao.TestConn;
+import com.dishonest.handler.CardHandler;
+import com.dishonest.dao.ConnUtil;
+import com.dishonest.handler.DishonestyService;
 import com.dishonest.util.HttpUtil;
 
 import java.sql.SQLException;
@@ -21,27 +22,24 @@ public class Main {
     }
 
     public static void main(String[] args) throws SQLException, InterruptedException {
-        /*Main main = new Main(50,System.getenv("COMPUTERNAME"));
-        main.worker();*/
-        Main main2 = new Main(2,"zhangkl");
-        main2.worker();
-
+        Main main = new Main(50, System.getenv("COMPUTERNAME"));
+        main.worker();
     }
 
     public void worker() throws SQLException, InterruptedException {
         ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
         String querySql = "select * from cred_dishonesty_log where result is null order by to_number(startpage) desc";
-        List list = TestConn.getInstance().executeQueryForList(querySql);
-        TestConn.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
+        List list = ConnUtil.getInstance().executeQueryForList(querySql);
+        ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
         Iterator it = list.iterator();
         int i = 0;
-        for (int j = 0; j < 50; j++) {
+        while (it.hasNext()) {
             Map map = (Map) it.next();
             String cardNum = (String) map.get("CARDNUM");
             String endpage = (String) map.get("ENDPAGE");
             String startpage = (String) map.get("STARTPAGE");
-            String sucessNum = (String) map.get("SUCESSNUM");
-            String sameNum = (String) map.get("SAMENUM");
+            int sucessNum = (Integer) map.get("SUCESSNUM");
+            int sameNum = (Integer) map.get("SAMENUM");
             String threadHostName = (String) map.get("HOSTNAME");
             if (threadHostName != null && !"".equals(threadHostName) && !hostName.equals(threadHostName)) {
                 continue;
@@ -51,10 +49,10 @@ public class Main {
                     httpUtil = new HttpUtil();
                     i++;
                 } else {
-                    httpUtil = new HttpUtil(true, TestNum.getProxy(0));
+                    httpUtil = new HttpUtil(true, DishonestyService.getProxy(0));
                 }
-                TestNum testNum = new TestNum("", cardNum, Integer.valueOf(startpage), Integer.valueOf(endpage), httpUtil, Integer.valueOf(sucessNum), Integer.valueOf(sameNum),hostName);
-                threadPool.execute(testNum);
+                CardHandler cardHandler = new CardHandler("", cardNum, Integer.valueOf(startpage), Integer.valueOf(endpage), httpUtil, sucessNum, sameNum, hostName, 1);
+                threadPool.execute(cardHandler);
                 Thread.sleep(1000);
             }
         }

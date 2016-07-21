@@ -9,6 +9,7 @@
 package com.dishonest.util;
 
 
+import com.dishonest.handler.CardHandler;
 import org.apache.http.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
@@ -288,6 +289,13 @@ public class HttpUtil {
             }
         }
         return "UTF-8";
+    }
+
+    public static void main(String[] args) throws IOException, InterruptedException {
+        HttpUtil httpUtil = new HttpUtil(true,"120.52.72.21:80");
+        String code = CardHandler.getImageCode(httpUtil);
+        new CardHandler(code, "", 0, 0, httpUtil, 0, 0, "").saveDishoney("2486501");
+        System.out.println(123123);
     }
 
 }

@@ -32,6 +32,7 @@ public class Main {
         List list = ConnUtil.getInstance().executeQueryForList(querySql);
         ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
         Iterator it = list.iterator();
+        int noProxy = 0;
         while (it.hasNext()) {
             Map map = (Map) it.next();
             String cardNum = (String) map.get("CARDNUM");
@@ -43,7 +44,13 @@ public class Main {
             if (threadHostName != null && !"".equals(threadHostName) && !hostName.equals(threadHostName)) {
                 continue;
             } else {
-                CardHandler cardHandler = new CardHandler("", cardNum, Integer.valueOf(startpage), Integer.valueOf(endpage), sucessNum, sameNum, hostName);
+                HttpUtil httpUtil;
+                if (noProxy < 5) {
+                    httpUtil = new HttpUtil();
+                } else{
+                    httpUtil = new HttpUtil(true,DishonestyService.getProxy(0));
+                }
+                CardHandler cardHandler = new CardHandler(httpUtil,"", cardNum, Integer.valueOf(startpage), Integer.valueOf(endpage), sucessNum, sameNum, hostName);
                 threadPool.execute(cardHandler);
                 Thread.sleep(1000);
             }

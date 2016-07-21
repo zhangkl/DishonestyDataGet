@@ -60,9 +60,21 @@ public class PageHandler {
             String logSql = "update cred_dishonesty_log set samenum = '" + sameNum + "',sucessnum='" + sucessNum + "', remark='" + logStr + "',startpage='" + pageNum + "',hostname='" + hostName + "',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
             ConnUtil.getInstance().executeSaveOrUpdate(logSql);
         } catch (IOException e) {
-            e.printStackTrace();
+            try {
+                dishonestyService.changeProxy(httpUtil);
+            } catch (SQLException e1) {
+                e1.printStackTrace();
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
+            }
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            try {
+                dishonestyService.changeProxy(httpUtil);
+            } catch (SQLException e1) {
+                e1.printStackTrace();
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
+            }
         } catch (ParserException e) {
             e.printStackTrace();
         } catch (SQLException e) {

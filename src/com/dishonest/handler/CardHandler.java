@@ -30,8 +30,9 @@ public class CardHandler implements Runnable {
     int sameNum;
     String code;
     String hostName;
+    HttpUtil httpUtil;
 
-    public CardHandler(String code, String cardNum, int startPageNum, int endPageNum, int sucessNum, int sameNum, String hostName) {
+    public CardHandler(HttpUtil httpUtil,String code, String cardNum, int startPageNum, int endPageNum, int sucessNum, int sameNum, String hostName) {
         this.code = code;
         this.cardNum = cardNum;
         this.startPageNum = startPageNum;
@@ -39,11 +40,13 @@ public class CardHandler implements Runnable {
         this.sucessNum = sucessNum;
         this.sameNum = sameNum;
         this.hostName = hostName;
+        this.httpUtil = httpUtil;
     }
 
     @Override
     public void run() {
-        HttpUtil httpUtil = new HttpUtil(true,"122.96.59.102:80");
+
+
         PageHandler pageHandler = new PageHandler(httpUtil,code,cardNum,hostName,sameNum,sucessNum);
         for (int i = startPageNum; i <= endPageNum; i++) {
             pageHandler.work(i+"");

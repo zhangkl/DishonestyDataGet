@@ -191,17 +191,7 @@ public class DishonestyService {
      * 获取并存储具体失信人信息
      */
     public void saveDishoney(String saveid,HttpUtil httpUtil,String code,String cardNum,int sameNum,int sucessNum) throws InterruptedException, IOException {
-        String queryIdSql = "select * from CRED_DISHONESTY_PERSON where iid = '" + saveid + "'";
-        List resultlist = null;
-        try {
-            resultlist = ConnUtil.getInstance().executeQueryForList(queryIdSql);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        if (resultlist != null && resultlist.size() > 0) {
-            sameNum++;
-            return;
-        }
+
         sendTime = 0;
         String idInfo = "";
         Map map = new HashMap();
@@ -276,6 +266,5 @@ public class DishonestyService {
             System.out.println(Thread.currentThread().getName() + ",saveid:" + saveid + ":idInfo" + idInfo +",getProxyURL:"+httpUtil.getProxyURL());
             e.printStackTrace();
         }
-        sucessNum++;
     }
 }

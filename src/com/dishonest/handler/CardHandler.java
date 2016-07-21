@@ -23,39 +23,34 @@ import java.util.concurrent.Executor;
  * To change this template use File | Settings | File Templates.
  */
 public class CardHandler implements Runnable {
-    ConnUtil connUtil;
     String cardNum;
     int endPageNum;
     int startPageNum;
     int sucessNum;
     int sameNum;
     String code;
-    HttpUtil httpUtil;
     String hostName;
-    int pagePoolSize = 0;
 
-    public CardHandler(String code, String cardNum, int startPageNum, int endPageNum, HttpUtil httpUtil, int sucessNum, int sameNum, String hostName, int pagePoolSize) {
+    public CardHandler(String code, String cardNum, int startPageNum, int endPageNum, int sucessNum, int sameNum, String hostName) {
         this.code = code;
         this.cardNum = cardNum;
         this.startPageNum = startPageNum;
         this.endPageNum = endPageNum;
-        this.httpUtil = httpUtil;
         this.sucessNum = sucessNum;
         this.sameNum = sameNum;
         this.hostName = hostName;
-        this.pagePoolSize = pagePoolSize;
     }
 
     @Override
     public void run() {
-        Executor executor = new MyFixedThreadPool(pagePoolSize);
+        HttpUtil httpUtil = new HttpUtil(true,"122.96.59.102:80");
+        PageHandler pageHandler = new PageHandler(httpUtil,code,cardNum,hostName,sameNum,sucessNum);
         for (int i = startPageNum; i <= endPageNum; i++) {
-            PageHandler pageHandler = new PageHandler(connUtil,httpUtil,code,cardNum,i+"",hostName,0,0);
-            executor.execute(pageHandler);
+            pageHandler.work(i+"");
         }
         String logSql = "update cred_dishonesty_log set result = '1',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
         try {
-            connUtil.executeSaveOrUpdate(logSql);
+            ConnUtil.getInstance().executeSaveOrUpdate(logSql);
         } catch (SQLException e) {
             e.printStackTrace();
         }

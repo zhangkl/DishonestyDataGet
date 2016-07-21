@@ -13,8 +13,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Main {
-    int threadPoolSize = 50;
-    String hostName = System.getenv("COMPUTERNAME");
+    int threadPoolSize ;
+    String hostName ;
 
     public Main(int threadPoolSize, String hostName) {
         this.threadPoolSize = threadPoolSize;
@@ -32,26 +32,18 @@ public class Main {
         List list = ConnUtil.getInstance().executeQueryForList(querySql);
         ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
         Iterator it = list.iterator();
-        int i = 0;
         while (it.hasNext()) {
             Map map = (Map) it.next();
             String cardNum = (String) map.get("CARDNUM");
             String endpage = (String) map.get("ENDPAGE");
             String startpage = (String) map.get("STARTPAGE");
-            int sucessNum = (Integer) map.get("SUCESSNUM");
-            int sameNum = (Integer) map.get("SAMENUM");
+            int sucessNum = (Integer.valueOf((String) map.get("SUCESSNUM")));
+            int sameNum = (Integer.valueOf((String)map.get("SAMENUM"))) ;
             String threadHostName = (String) map.get("HOSTNAME");
             if (threadHostName != null && !"".equals(threadHostName) && !hostName.equals(threadHostName)) {
                 continue;
             } else {
-                HttpUtil httpUtil;
-                if (i < 5) {
-                    httpUtil = new HttpUtil();
-                    i++;
-                } else {
-                    httpUtil = new HttpUtil(true, DishonestyService.getProxy(0));
-                }
-                CardHandler cardHandler = new CardHandler("", cardNum, Integer.valueOf(startpage), Integer.valueOf(endpage), httpUtil, sucessNum, sameNum, hostName, 1);
+                CardHandler cardHandler = new CardHandler("", cardNum, Integer.valueOf(startpage), Integer.valueOf(endpage), sucessNum, sameNum, hostName);
                 threadPool.execute(cardHandler);
                 Thread.sleep(1000);
             }

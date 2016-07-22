@@ -164,7 +164,7 @@ public class DishonestyService {
      */
     public void changeProxy(HttpUtil httpUtil) throws SQLException, InterruptedException {
         if ("null:0".equals(httpUtil.getProxyURL())) {
-            System.out.println(DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":重复访问出错,更换前代理:" + httpUtil.getProxyURL());
+            System.out.println(DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":重复访问出错,无代理不更换，休眠30分钟。");
             Thread.sleep(1000 * 60 * 30);
         } else {
             System.out.println(DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":重复访问出错,更换前代理:" + httpUtil.getProxyURL());
@@ -219,12 +219,17 @@ public class DishonestyService {
             idInfo = httpUtil.doGetString("http://shixin.court.gov.cn/findDetai", map);
             sendTime++;
         }
-        JSONObject json;
+        if (idInfo == null || !idInfo.startsWith("{")){
+            changeProxy(httpUtil);
+            saveDishoney(saveid,httpUtil,cardNum);
+        }
+        JSONObject json = null;
         try {
             json = JSONObject.fromObject(idInfo);
         } catch (JSONException jsonE) {
             System.out.println(idInfo);
-            throw jsonE;
+            changeProxy(httpUtil);
+            saveDishoney(saveid,httpUtil,cardNum);
         }
         Integer iid = json.optInt("id");
         String siname = json.optString("iname");

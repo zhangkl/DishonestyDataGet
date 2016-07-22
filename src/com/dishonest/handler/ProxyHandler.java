@@ -41,7 +41,7 @@ public class ProxyHandler implements Runnable {
 
     public static void main(String[] args) {
         try {
-            getProxy("http://www.youdaili.net/Daili/guonei/4733.html");
+            getProxy("http://www.youdaili.net/Daili/Socks/4737.html");
         } catch (Exception e) {
             e.printStackTrace();
         }

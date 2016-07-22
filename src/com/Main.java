@@ -1,8 +1,8 @@
 package com;
 
-import com.dishonest.handler.CardHandler;
 import com.dishonest.dao.ConnUtil;
 import com.dishonest.handler.DishonestyService;
+import com.dishonest.handler.PageHandler;
 import com.dishonest.util.HttpUtil;
 
 import java.sql.SQLException;
@@ -13,22 +13,27 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class Main {
-    int threadPoolSize ;
-    String hostName ;
+    int threadPoolSize;
+    String hostName;
+    boolean hostNameLimit;
 
-    public Main(int threadPoolSize, String hostName) {
+    public Main(int threadPoolSize, String hostName, boolean hostNameLimit) {
         this.threadPoolSize = threadPoolSize;
         this.hostName = hostName;
+        this.hostNameLimit = hostNameLimit;
     }
 
     public static void main(String[] args) throws SQLException, InterruptedException {
-        Main main = new Main(50, System.getenv("COMPUTERNAME"));
+        Main main = new Main(50, System.getenv("COMPUTERNAME"),false);
         main.worker();
     }
 
     public void worker() throws SQLException, InterruptedException {
         ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
         String querySql = "select * from cred_dishonesty_log where result is null order by to_number(startpage) desc";
+        if (hostNameLimit) {
+            querySql = "select * from cred_dishonesty_log where result is null and hostname = '" + hostName + "' order by to_number(startpage) desc";
+        }
         List list = ConnUtil.getInstance().executeQueryForList(querySql);
         ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
         Iterator it = list.iterator();
@@ -36,24 +41,25 @@ public class Main {
         while (it.hasNext()) {
             Map map = (Map) it.next();
             String cardNum = (String) map.get("CARDNUM");
-            String endpage = (String) map.get("ENDPAGE");
-            String startpage = (String) map.get("STARTPAGE");
+            int endpage = Integer.valueOf((String) map.get("ENDPAGE"));
+            int startpage = Integer.valueOf((String) map.get("STARTPAGE"));
             int sucessNum = (Integer.valueOf((String) map.get("SUCESSNUM")));
-            int sameNum = (Integer.valueOf((String)map.get("SAMENUM"))) ;
+            int sameNum = (Integer.valueOf((String) map.get("SAMENUM")));
             String threadHostName = (String) map.get("HOSTNAME");
             if (threadHostName != null && !"".equals(threadHostName) && !hostName.equals(threadHostName)) {
                 continue;
             } else {
-                HttpUtil httpUtil;
                 if (noProxy < 5) {
-                    httpUtil = new HttpUtil();
-                } else{
-                    httpUtil = new HttpUtil(true,DishonestyService.getProxy(0));
+                    PageHandler pageHandler = new PageHandler(startpage, endpage, new HttpUtil(), "", cardNum, hostName, sucessNum, sameNum);
+                    noProxy++;
+                    threadPool.execute(pageHandler);
+                } else {
+                    PageHandler pageHandler = new PageHandler(startpage, endpage, new HttpUtil(true, DishonestyService.getProxy(0)), "", cardNum, hostName, sucessNum, sameNum);
+                    threadPool.execute(pageHandler);
                 }
-                CardHandler cardHandler = new CardHandler(httpUtil,"", cardNum, Integer.valueOf(startpage), Integer.valueOf(endpage), sucessNum, sameNum, hostName);
-                threadPool.execute(cardHandler);
                 Thread.sleep(1000);
             }
         }
+        threadPool.shutdown();
     }
 }

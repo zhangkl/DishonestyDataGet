@@ -14,15 +14,19 @@ import java.util.List;
  * User: zhangkl
  * Date: 七月,2016
  */
-public class PageHandler {
+public class PageHandler implements Runnable {
     String code;
     String cardNum;
     String hostName;
     int sameNum;
     int sucessNum;
     HttpUtil httpUtil;
+    int startPage;
+    int endPage;
 
-    public PageHandler(HttpUtil httpUtil,String code, String cardNum, String hostName, int sameNum, int sucessNum) {
+    public PageHandler(int startPage, int endPage, HttpUtil httpUtil, String code, String cardNum, String hostName, int sameNum, int sucessNum) {
+        this.startPage = startPage;
+        this.endPage = endPage;
         this.code = code;
         this.cardNum = cardNum;
         this.hostName = hostName;
@@ -31,13 +35,23 @@ public class PageHandler {
         this.httpUtil = httpUtil;
     }
 
+    @Override
+    public void run() {
+        for (int i = startPage; i <= endPage; i++) {
+            work(i + "");
+        }
+        String logSql = "update cred_dishonesty_log set result = '1',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
+        try {
+            ConnUtil.getInstance().executeSaveOrUpdate(logSql);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
     public void work(String pageNum) {
         DishonestyService dishonestyService = new DishonestyService();
         try {
-            if ("".equals(code)) {
-                code = dishonestyService.getImageCode(httpUtil);
-            }
-            List arrayList = dishonestyService.getPageList(httpUtil, code, cardNum, pageNum);
+            List arrayList = dishonestyService.getPageList(httpUtil, cardNum, pageNum);
             for (int i = 0; i < arrayList.size(); i++) {
                 String saveid = arrayList.get(i).toString();
                 String queryIdSql = "select * from CRED_DISHONESTY_PERSON where iid = '" + saveid + "'";
@@ -50,8 +64,8 @@ public class PageHandler {
                 if (resultlist != null && resultlist.size() > 0) {
                     sameNum++;
                     continue;
-                }else{
-                    dishonestyService.saveDishoney(arrayList.get(i).toString(), httpUtil, code, cardNum, sameNum, sucessNum);
+                } else {
+                    dishonestyService.saveDishoney(arrayList.get(i).toString(), httpUtil, cardNum);
                     sucessNum++;
                 }
             }
@@ -67,6 +81,7 @@ public class PageHandler {
             } catch (InterruptedException e1) {
                 e1.printStackTrace();
             }
+            work(pageNum);
         } catch (InterruptedException e) {
             try {
                 dishonestyService.changeProxy(httpUtil);
@@ -75,6 +90,7 @@ public class PageHandler {
             } catch (InterruptedException e1) {
                 e1.printStackTrace();
             }
+            work(pageNum);
         } catch (ParserException e) {
             e.printStackTrace();
         } catch (SQLException e) {

@@ -9,7 +9,6 @@
 package com.dishonest.util;
 
 
-import com.dishonest.handler.CardHandler;
 import org.apache.http.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
@@ -40,7 +39,7 @@ public class HttpUtil {
     private String cookies = null;
     private HttpClient httpClient;
     private int sendTimes = 0;
-    private int maxTimes = 5;
+    private int maxTimes = 1;
 
     public HttpUtil(boolean isProxy, String proxyURL) {
         this.isProxy = isProxy;
@@ -48,6 +47,7 @@ public class HttpUtil {
         this.proxyPort = Integer.parseInt(proxyURL.split(":")[1]);
         httpClient = HttpClients.createDefault();
     }
+
     public HttpUtil() {
         httpClient = HttpClients.createDefault();
     }
@@ -75,30 +75,49 @@ public class HttpUtil {
 
     public String doGetString(String url, Map params) throws InterruptedException {
         Object object;
-        do {
+        object = doGet(url, params);
+        sendTimes = 0;
+        while (sendTimes < maxTimes && object == null) {
+            System.out.println("url:"+url+" :发送错误，重新发起。");
+            Thread.sleep(1000*5);
             object = doGet(url, params);
             sendTimes++;
-            if (object == null) {
-                System.out.println(Thread.currentThread().getName() + ":" + url + ":" + params + ",doGetByte获取错误次数" + sendTimes + ",线程休眠");
-                Thread.sleep(10000);
-            }
-        } while (sendTimes <= maxTimes && object == null);
-        sendTimes = 0;
+        }
         return object.toString();
     }
 
     public byte[] doGetByte(String url, Map params) throws InterruptedException, ClassCastException {
         Object object;
-        do {
+        object = doGet(url, params);
+        sendTimes = 0;
+        while (sendTimes < maxTimes && (object == null || object instanceof String)) {
+            System.out.println("url:"+url+" :发送错误，重新发起。");
+            Thread.sleep(1000*5);
             object = doGet(url, params);
             sendTimes++;
-            if (object == null) {
-                System.out.println(Thread.currentThread().getName() + ":" + url + ":" + params + ",doGetByte获取错误次数" + sendTimes + ",线程休眠");
-                Thread.sleep(10000);
-            }
-        } while (sendTimes <= maxTimes && (object == null || object instanceof String));
+        }
+        if ((object == null || object instanceof String)){
+            return null;
+        }else{
+            return (byte[]) object;
+        }
+    }
+
+    public String doPostString(String url, final Object... paramlist) throws InterruptedException {
+        Map<String, Object> map = new HashMap<String, Object>();
+        for (int i = 0; i < paramlist.length / 2; i++) {
+            map.put(paramlist[i * 2].toString(), paramlist[i * 2 + 1]);
+        }
+        Object object;
+        object = doPost(url, map);
         sendTimes = 0;
-        return (byte[]) object;
+        while (sendTimes <= maxTimes && object == null) {
+            System.out.println("url:"+url+" :发送错误，重新发起。");
+            Thread.sleep(1000*5);
+            object = doPost(url, map);
+            sendTimes++;
+        }
+        return object.toString();
     }
 
     public Object doGet(String url, Map params) throws InterruptedException {
@@ -155,33 +174,15 @@ public class HttpUtil {
                 sendTimes = 0;
                 return result;
             } else {
-                errorInfo += Thread.currentThread().getName() + ":" + url + ",doGet请求响应码：" + httpResponse.getStatusLine().getStatusCode();
+                errorInfo += Thread.currentThread().getName() + ":" + url + " ,doGet请求响应码：" + httpResponse.getStatusLine().getStatusCode();
             }
         } catch (ClientProtocolException e) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + ",调用doGet异常：" + e.getMessage();
+            errorInfo += Thread.currentThread().getName() + ":" + url + " ,调用doGet异常：" + e.getMessage();
         } catch (IOException e) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + ",调用doGet异常：" + e.getMessage();
+            errorInfo += Thread.currentThread().getName() + ":" + url + " ,调用doGet异常：" + e.getMessage();
         }
         httpRequest.abort();
         return errorInfo;
-    }
-
-    public String doPostString(String url, final Object... paramlist) throws InterruptedException {
-        Map<String, Object> map = new HashMap<String, Object>();
-        for (int i = 0; i < paramlist.length / 2; i++) {
-            map.put(paramlist[i * 2].toString(), paramlist[i * 2 + 1]);
-        }
-        Object object;
-        do {
-            object = doPost(url, map);
-            sendTimes++;
-            if (object == null) {
-                System.out.println(Thread.currentThread().getName() + ":" + url + ":" + map + ":doPost获取错误次数" + sendTimes + ",线程休眠");
-                Thread.sleep(10000);
-            }
-        } while (sendTimes <= maxTimes && object == null);
-        sendTimes = 0;
-        return object.toString();
     }
 
     private Object doPost(String url, Map map) throws InterruptedException {
@@ -233,11 +234,11 @@ public class HttpUtil {
                 sendTimes = 0;
                 return result;
             } else {
-                errorInfo += Thread.currentThread().getName() + ":" + url + ":" + params + ",post请求响应码：" + httpResponse.getStatusLine().getStatusCode();
+                errorInfo += Thread.currentThread().getName() + ":" + url + " :" + params + ",doPost请求响应码：" + httpResponse.getStatusLine().getStatusCode();
             }
 
         } catch (Exception exception) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + ":" + params + ",调用doPost异常：" + exception.getMessage();
+            errorInfo += Thread.currentThread().getName() + ":" + url + " :" + params + ",调用doPost异常：" + exception.getMessage();
         }
         httpRequest.abort();
         return errorInfo;
@@ -292,8 +293,7 @@ public class HttpUtil {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        HttpUtil httpUtil = new HttpUtil(true,"120.52.72.21:80");
-        System.out.println(123123);
+        HttpUtil httpUtil = new HttpUtil(true, "120.52.72.21:80");
     }
 
 }

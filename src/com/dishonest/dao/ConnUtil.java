@@ -20,7 +20,7 @@ public class ConnUtil {
 
     //几个数据库变量
     //dbUrl数据库连接串信息，其中“1521”为端口，“ora9”为sid
-    String dbUrl = "jdbc:oracle:thin:@localhost:1521:orcl";
+    String dbUrl = "jdbc:oracle:thin:@192.168.0.196:1521:cred";
     //theUser为数据库用户名
     String theUser = "cred";
     //thePw为数据库密码

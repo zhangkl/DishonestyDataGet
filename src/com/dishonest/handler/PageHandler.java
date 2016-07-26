@@ -15,19 +15,25 @@ import java.util.List;
  * Date: 七月,2016
  */
 public class PageHandler implements Runnable {
-    String code;
     String cardNum;
+    String pageNum;
     String hostName;
-    int sameNum;
-    int sucessNum;
+    static int sameNum;
+    static int sucessNum;
     HttpUtil httpUtil;
     int startPage;
     int endPage;
 
-    public PageHandler(int startPage, int endPage, HttpUtil httpUtil, String code, String cardNum, String hostName, int sameNum, int sucessNum) {
+    public PageHandler(String cardNum, String pageNum, String hostName, HttpUtil httpUtil) {
+        this.cardNum = cardNum;
+        this.pageNum = pageNum;
+        this.hostName = hostName;
+        this.httpUtil = httpUtil;
+    }
+
+    public PageHandler(int startPage, int endPage, HttpUtil httpUtil, String cardNum, String hostName, int sameNum, int sucessNum) {
         this.startPage = startPage;
         this.endPage = endPage;
-        this.code = code;
         this.cardNum = cardNum;
         this.hostName = hostName;
         this.sameNum = sameNum;
@@ -39,10 +45,41 @@ public class PageHandler implements Runnable {
     public void run() {
         for (int i = startPage; i <= endPage; i++) {
             work(i + "");
+            //getAllCount(i + "");
         }
         String logSql = "update cred_dishonesty_log set result = '1',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
         try {
             ConnUtil.getInstance().executeSaveOrUpdate(logSql);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void getAllCount(String pageNum) {
+        DishonestyService dishonestyService = new DishonestyService();
+        try {
+            String s = dishonestyService.getPageHtml(httpUtil, cardNum, pageNum);
+            String account = dishonestyService.getPageAccount(s);
+            System.out.println(cardNum + ":" + account);
+            dishonestyService.saveAllCount(cardNum, account);
+        } catch (IOException e) {
+            try {
+                dishonestyService.changeProxy(httpUtil);
+            } catch (SQLException e1) {
+                e1.printStackTrace();
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
+            }
+            e.printStackTrace();
+        } catch (InterruptedException e) {
+            try {
+                dishonestyService.changeProxy(httpUtil);
+            } catch (SQLException e1) {
+                e1.printStackTrace();
+            } catch (InterruptedException e1) {
+                e1.printStackTrace();
+            }
+            e.printStackTrace();
         } catch (SQLException e) {
             e.printStackTrace();
         }

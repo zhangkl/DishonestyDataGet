@@ -69,13 +69,14 @@ public class DishonestyService {
      * @param cons
      * @return
      */
-    public static int getPageAccount(String cons) {
+    public String getPageAccount(String cons) {
         int start = cons.indexOf("<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页");
         int length = "<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页".length();
         int end = cons.indexOf("条\n" +
                 "\t\t</div>");
         int page = Integer.parseInt(cons.substring(start + length, end).split("/")[1].split(" ")[0]);
-        return page;
+        String allAccount = cons.substring(start + length, end).split("/")[1].split("共")[1].replaceAll("条", "");
+        return allAccount;
     }
 
     /**
@@ -141,7 +142,7 @@ public class DishonestyService {
      * @return
      * @throws SQLException
      */
-    public static String getProxy(int istatus) throws SQLException {
+    public synchronized static String getProxy(int istatus) throws SQLException {
         String proxyUrl;
         Map map = ConnUtil.getInstance().executeQueryForMap("select * from cred_dishonesty_proxy where isusered = '" + istatus + "'");
         if (map == null) {
@@ -149,7 +150,8 @@ public class DishonestyService {
             System.out.println("****************************代理已用光,重置所有代理状态为可用****************************");
             System.out.println("*************************************************************************************");
             ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
-            getProxy(istatus);
+            //getProxy(istatus);
+            map = ConnUtil.getInstance().executeQueryForMap("select * from cred_dishonesty_proxy where isusered = '" + istatus + "'");
         }
         proxyUrl = (String) map.get("PROXYURL");
         ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 1 where proxyurl = '" + proxyUrl + "'");
@@ -180,9 +182,14 @@ public class DishonestyService {
      * 访问错误，重复发起，增加最大访问次数控制
      */
     public List getPageList(HttpUtil httpUtil, String cardNum, String pageNum) throws ParserException, IOException, InterruptedException, SQLException {
+        String s = getPageHtml(httpUtil, cardNum, pageNum);
+        List arrayList = getIDList(s);
+        return arrayList;
+    }
+
+    public String getPageHtml(HttpUtil httpUtil, String cardNum, String pageNum) throws InterruptedException, SQLException, IOException {
         sendTime = 0;
         String s;
-        List arrayList;
         if (code == null || "".equals(code)) {
             code = getImageCode(httpUtil);
         }
@@ -194,8 +201,7 @@ public class DishonestyService {
             s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
             sendTime++;
         }
-        arrayList = getIDList(s);
-        return arrayList;
+        return s;
     }
 
     /**
@@ -219,9 +225,9 @@ public class DishonestyService {
             idInfo = httpUtil.doGetString("http://shixin.court.gov.cn/findDetai", map);
             sendTime++;
         }
-        if (idInfo == null || !idInfo.startsWith("{")){
+        if (idInfo == null || !idInfo.startsWith("{")) {
             changeProxy(httpUtil);
-            saveDishoney(saveid,httpUtil,cardNum);
+            saveDishoney(saveid, httpUtil, cardNum);
         }
         JSONObject json = null;
         try {
@@ -229,7 +235,7 @@ public class DishonestyService {
         } catch (JSONException jsonE) {
             System.out.println(idInfo);
             changeProxy(httpUtil);
-            saveDishoney(saveid,httpUtil,cardNum);
+            saveDishoney(saveid, httpUtil, cardNum);
         }
         Integer iid = json.optInt("id");
         String siname = json.optString("iname");
@@ -281,5 +287,34 @@ public class DishonestyService {
             System.out.println(Thread.currentThread().getName() + ",saveid:" + saveid + ":idInfo" + idInfo + ",getProxyURL:" + httpUtil.getProxyURL());
             e.printStackTrace();
         }
+    }
+
+    public void saveAllCount(String cardNum, String account) throws SQLException {
+        String sql = "update cred_dishonesty_log set allcount = '" + account + "' where cardnum = '" + cardNum + "'";
+        ConnUtil.getInstance().executeSaveOrUpdate(sql);
+    }
+
+    /**
+     * 获取待执行任务列表
+     * @param hostNameLimit
+     * @param hostName
+     * @return
+     * @throws SQLException
+     */
+    public List getExeList(boolean hostNameLimit,String hostName) throws SQLException {
+        String querySql = "select * from cred_dishonesty_log where result is null order by to_number(startpage) desc";
+        if (hostNameLimit) {
+            querySql = "select * from cred_dishonesty_log where result is null and hostname = '" + hostName + "' order by to_number(startpage) desc";
+        }
+        List list = ConnUtil.getInstance().executeQueryForList(querySql);
+        return list;
+    }
+
+    /**
+     * 重置代理表状态，修改正在使用状态的代理为未使用。
+     * @throws SQLException
+     */
+    public void resetProxy() throws SQLException {
+        ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
     }
 }

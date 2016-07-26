@@ -1,6 +1,5 @@
 package com;
 
-import com.dishonest.dao.ConnUtil;
 import com.dishonest.handler.DishonestyService;
 import com.dishonest.handler.PageHandler;
 import com.dishonest.util.HttpUtil;
@@ -24,18 +23,15 @@ public class Main {
     }
 
     public static void main(String[] args) throws SQLException, InterruptedException {
-        Main main = new Main(50, System.getenv("COMPUTERNAME"),false);
+        Main main = new Main(10, System.getenv("COMPUTERNAME"),false);
         main.worker();
     }
 
     public void worker() throws SQLException, InterruptedException {
         ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
-        String querySql = "select * from cred_dishonesty_log where result is null order by to_number(startpage) desc";
-        if (hostNameLimit) {
-            querySql = "select * from cred_dishonesty_log where result is null and hostname = '" + hostName + "' order by to_number(startpage) desc";
-        }
-        List list = ConnUtil.getInstance().executeQueryForList(querySql);
-        ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
+        DishonestyService service = new DishonestyService();
+        List list = service.getExeList(hostNameLimit,hostName);
+        service.resetProxy();
         Iterator it = list.iterator();
         int noProxy = 0;
         while (it.hasNext()) {
@@ -49,12 +45,12 @@ public class Main {
             if (threadHostName != null && !"".equals(threadHostName) && !hostName.equals(threadHostName)) {
                 continue;
             } else {
-                if (noProxy < 5) {
-                    PageHandler pageHandler = new PageHandler(startpage, endpage, new HttpUtil(), "", cardNum, hostName, sucessNum, sameNum);
+                if (noProxy < 10) {
+                    PageHandler pageHandler = new PageHandler(startpage, endpage, new HttpUtil(), cardNum, hostName, sucessNum, sameNum);
                     noProxy++;
                     threadPool.execute(pageHandler);
                 } else {
-                    PageHandler pageHandler = new PageHandler(startpage, endpage, new HttpUtil(true, DishonestyService.getProxy(0)), "", cardNum, hostName, sucessNum, sameNum);
+                    PageHandler pageHandler = new PageHandler(startpage, endpage, new HttpUtil(true, DishonestyService.getProxy(0)), cardNum, hostName, sucessNum, sameNum);
                     threadPool.execute(pageHandler);
                 }
                 Thread.sleep(1000);

@@ -41,7 +41,6 @@ public class CheckNumber {
                     stringBuffer.append(",");
                 }
             }
-            System.out.println(stringBuffer.toString());
         }
     }
 

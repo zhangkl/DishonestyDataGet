@@ -12,6 +12,13 @@ import com.dishonest.dao.ConnUtil;
 import com.dishonest.util.CheckNumber;
 import com.dishonest.util.HttpUtil;
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
+import org.apache.http.HttpHost;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.HttpClient;
+import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.log4j.Logger;
 import org.htmlparser.NodeFilter;
 import org.htmlparser.Parser;
 import org.htmlparser.filters.AndFilter;
@@ -36,18 +43,55 @@ import java.util.*;
  */
 public class ProxyHandler implements Runnable {
 
+    Logger logger = Logger.getLogger(ProxyHandler.class);
+
     private int sendtimes = 0;
     private int maxtimes = 5;
 
-    public static void main(String[] args) {
+    String proxyurl;
+
+    public ProxyHandler(String proxyurl) {
+        this.proxyurl = proxyurl;
+    }
+
+    public ProxyHandler() {
+
+    }
+
+    public static void main(String[] args) throws SQLException {
         try {
-            getProxy("http://www.youdaili.net/Daili/Socks/4737.html");
+            ProxyHandler proxyHandler = new ProxyHandler();
+            proxyHandler.getProxy("http://www.youdaili.net/Daili/http/4786.html");
+        } catch (ParserException e) {
+            e.printStackTrace();
+        }
+        /*ExecutorService executorService = Executors.newFixedThreadPool(5);
+        try {
+            List list = ConnUtil.getInstance().executeQueryForList("select * from cred_dishonesty_proxy where isusered != 2");
+            Iterator iterator = list.iterator();
+            while (iterator.hasNext()) {
+                Map map = (Map) iterator.next();
+                String proxyurl = (String) map.get("PROXYURL");
+                ProxyHandler proxyHandler = new ProxyHandler(proxyurl);
+
+                executorService.execute(proxyHandler);
+            }
         } catch (Exception e) {
+            e.printStackTrace();
+        }
+        executorService.shutdown();*/
+    }
+
+    @Override
+    public void run() {
+        try {
+            checkProxy("http://www.baidu.com");
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }
 
-    public static void getProxy(String url) throws ParserException {
+    public void getProxy(String url) throws ParserException, SQLException {
         Parser parser = new Parser(url);
         parser.setEncoding("utf-8");
         NodeFilter filter1 = new HasAttributeFilter("style", "font-size:14px;");
@@ -57,13 +101,14 @@ public class ProxyHandler implements Runnable {
         System.out.println(nodes.asString());
         String[] strings = nodes.asString().split("\n");
         for (int i = 0; i < strings.length - 5; i++) {
-            if (strings[i].contains("@")){
+            if (strings[i].contains("@")) {
                 System.out.println(i + ":" + strings[i].split("@")[0]);
                 try {
                     ConnUtil.getInstance().executeSaveOrUpdate("insert into cred_dishonesty_proxy (proxyurl,dgetdata,isusered) values ('" + strings[i].split("@")[0] + "',sysdate,0)");
                 } catch (SQLException e) {
                     if (e.getMessage().contains("ORA-00001: 违反唯一约束条件 (CRED.PK_PROXY)")) {
                         System.out.println(e.getMessage());
+                        ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where proxyurl = '" + strings[i].split("@")[0] + "'");
                         continue;
                     } else {
                         e.printStackTrace();
@@ -74,7 +119,31 @@ public class ProxyHandler implements Runnable {
 
     }
 
-    public static void getNetStatus() throws IOException {
+    public void checkProxy(String url) throws SQLException {
+        HttpGet httpRequest = new HttpGet(url);
+
+        HttpHost proxy = new HttpHost(proxyurl.split(":")[0].toString(), Integer.valueOf(proxyurl.split(":")[1]), "http");
+        RequestConfig config = RequestConfig.custom().setProxy(proxy).setConnectTimeout(2000).setConnectionRequestTimeout(2000)
+                .setSocketTimeout(2000).build();
+        httpRequest.setConfig(config);
+        int status ;
+        try {
+            long startTime = System.currentTimeMillis();
+            HttpClient httpClient = HttpClients.createDefault();
+            HttpResponse httpResponse = httpClient.execute(httpRequest);
+            long endTime = System.currentTimeMillis();
+            status =  httpResponse.getStatusLine().getStatusCode();
+            System.out.println(proxyurl + ":" + status+"响应时间:" + (endTime - startTime) + "ms");
+        } catch (Exception e) {
+            System.out.println(proxyurl+e.getMessage());
+            status =  0;
+        }
+        if (status != 200 && status != 403 && status != 500) {
+            ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 2 where proxyurl = '" + proxyurl + "'");
+        }
+    }
+
+    public void getNetStatus() throws IOException {
         Process process = Runtime.getRuntime().exec("ping shixin.court.gov.cn -t");
         InputStreamReader isr = new InputStreamReader(process.getInputStream(), "GBK");
         LineNumberReader reader = new LineNumberReader(isr);
@@ -84,7 +153,7 @@ public class ProxyHandler implements Runnable {
         }
     }
 
-    public static void compare() {
+    public void compare() {
         String[] strings = new String[]{"0:1238 共12372", "660:14 共135", "661:7 共66", "662:16 共151", "663:9 共87", "664:18 共174", "665:16 共151", "666:13 共123", "667:41 共401", "668:16 共160", "669:166 共1659", "670:227 共2269", "671:44 共440", "672:147 共1467", "673:43 共423", "674:140 共1392", "675:82 共813", "676:31 共301", "677:30 共294", "678:56 共556", "679:28 共274", "680:2 共17", "681:25 共241", "682:21 共203", "683:18 共171", "684:12 共113", "685:1 共0", "686:9 共83", "687:5 共45", "688:2 共12", "689:7 共65", "690:9 共86", "691:1 共0", "692:1 共0", "693:1 共0"};
         int sum = 0;
         for (int i = 1; i < strings.length; i++) {
@@ -94,7 +163,7 @@ public class ProxyHandler implements Runnable {
         System.out.println(sum);
     }
 
-    public static void getSame() throws InterruptedException, IOException {
+    public void getSame() throws InterruptedException, IOException {
         HttpUtil httpUtil = new HttpUtil();
         Map map = new HashMap();
         for (int i = 1; i <= 10; i++) {
@@ -117,7 +186,7 @@ public class ProxyHandler implements Runnable {
         }
     }
 
-    public static List<String> getIDList(String cons) {
+    public List<String> getIDList(String cons) {
         ArrayList list = new ArrayList();
         if (cons == null || "".equals(cons) || cons.contains("验证码错误")) {
             return null;
@@ -140,7 +209,7 @@ public class ProxyHandler implements Runnable {
         return list;
     }
 
-    public static void getAccount() throws InterruptedException, IOException, SQLException {
+    public void getAccount() throws InterruptedException, IOException, SQLException {
         HttpUtil httpUtil = new HttpUtil();
         ConnUtil connUtil = ConnUtil.getInstance();
         List list = connUtil.executeQueryForList("select * from cred_dishonesty_log");
@@ -162,7 +231,7 @@ public class ProxyHandler implements Runnable {
         }
     }
 
-    public static String getPageAccount(String cons) {
+    public String getPageAccount(String cons) {
         int start = cons.indexOf("<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页");
         int length = "<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页".length();
         int end = cons.indexOf("条\n" +
@@ -185,42 +254,5 @@ public class ProxyHandler implements Runnable {
         }
     }
 
-    @Override
-    public void run() {
-        do {
-            sendtimes++;
-            System.out.println(Thread.currentThread().getName() + ":" + sendtimes);
-        } while (sendtimes <= maxtimes);
-        sendtimes = 0;
 
-        /*for (int i = 150; i < 1520; i++) {
-            try {
-                List idrs = testConn.executeQueryForList("select * from CRED_DISHONESTY_PERSON where iid = '" + i + "'");
-                if (idrs != null && idrs.size() > 0) {
-                    testConn.executeSave("delete from CRED_DISHONESTY_PERSON where iid = '" + i + "'");
-                }
-
-                List  list = new ArrayList();
-                list.add(i);
-                list.add(i);
-                list.add(i);
-                testConn.executeSave("update cred_dishonesty_log set dcurrentdate = sysdate where cardnum = 0101");
-                testConn.psAdd("insert into CRED_DISHONESTY_PERSON (IID, SINAME, SCARDNUM) values (?, ?, ?)",list);
-
-                idrs = testConn.executeQueryForList("select * from CRED_DISHONESTY_PERSON where iid = '" + i + "'");
-                if (idrs != null && idrs.size() > 0) {
-                    testConn.executeSave("delete from CRED_DISHONESTY_PERSON where iid = '" + i + "'");
-                }
-
-                List rs = testConn.executeQueryForList("select count(*) num from v$process");
-                Iterator it = rs.iterator();
-                while (it.hasNext()){
-                    Map map = (Map) it.next();
-                    System.out.println(Thread.currentThread().getName()+":"+map.get("NUM"));
-                }
-            } catch (SQLException e) {
-                e.printStackTrace();
-            }
-        }*/
-    }
 }

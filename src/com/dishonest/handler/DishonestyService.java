@@ -3,10 +3,12 @@ package com.dishonest.handler;
 import com.dishonest.dao.ConnUtil;
 import com.dishonest.util.CheckNumber;
 import com.dishonest.util.DateUtil;
+import com.dishonest.util.GetDateException;
 import com.dishonest.util.HttpUtil;
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
+import org.apache.log4j.Logger;
 import org.htmlparser.NodeFilter;
 import org.htmlparser.Parser;
 import org.htmlparser.filters.AndFilter;
@@ -19,6 +21,7 @@ import org.htmlparser.util.ParserException;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.StringReader;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -33,9 +36,11 @@ import java.util.Map;
  */
 public class DishonestyService {
 
+    Logger logger = Logger.getLogger(DishonestyService.class);
+
     int sendTime;
-    int maxTime = 3;
-    String code;
+    int maxTime = 5;
+    ConnUtil connUtil = ConnUtil.getInstance();
 
     /**
      * 获取图片验证码
@@ -46,20 +51,21 @@ public class DishonestyService {
      * @throws InterruptedException
      */
     public String getImageCode(HttpUtil httpUtil) throws IOException, InterruptedException, SQLException {
-        DishonestyService dishonestyService = new DishonestyService();
         byte[] result = httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=" + System.currentTimeMillis(), null);
-        while (result == null) {
+        while (sendTime < maxTime && (result == null || result.length == 0)) {
+            logger.info("获取验证码失败，开始休眠，1分钟,发送次数:" + sendTime );
+            Thread.currentThread().sleep(1000 * 60 * 1);
             result = httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=" + System.currentTimeMillis(), null);
             sendTime++;
-            if (sendTime < maxTime && result == null) {
-                dishonestyService.changeProxy(httpUtil);
-                getImageCode(httpUtil);
-            }
+        }
+        if (result == null || result.length == 0) {
+            throw new InterruptedIOException("获取验证码失败，线程停止。");
         }
         ByteInputStream bin = new ByteInputStream();
         bin.setBuf(result);
         BufferedImage image = ImageIO.read(bin);
         String code = CheckNumber.getCheckNumber(image);
+        httpUtil.setCode(code);
         return code;
     }
 
@@ -77,6 +83,15 @@ public class DishonestyService {
         int page = Integer.parseInt(cons.substring(start + length, end).split("/")[1].split(" ")[0]);
         String allAccount = cons.substring(start + length, end).split("/")[1].split("共")[1].replaceAll("条", "");
         return allAccount;
+    }
+
+    public int getMaxPage(String cons) {
+        int start = cons.indexOf("<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页");
+        int length = "<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页".length();
+        int end = cons.indexOf("条\n" +
+                "\t\t</div>");
+        int page = Integer.parseInt(cons.substring(start + length, end).split("/")[1].split(" ")[0]);
+        return page;
     }
 
     /**
@@ -142,19 +157,20 @@ public class DishonestyService {
      * @return
      * @throws SQLException
      */
-    public synchronized static String getProxy(int istatus) throws SQLException {
+    public synchronized String getProxy(int istatus) throws SQLException, InterruptedException {
         String proxyUrl;
-        Map map = ConnUtil.getInstance().executeQueryForMap("select * from cred_dishonesty_proxy where isusered = '" + istatus + "'");
+        Map map = connUtil.executeQueryForMap("select * from cred_dishonesty_proxy where isusered = '" + istatus + "'");
+        while (map == null && sendTime < maxTime) {
+            sendTime++;
+            logger.info("****************************代理已用光,重置所有代理状态为可用****************************");
+            connUtil.executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
+            map = connUtil.executeQueryForMap("select * from cred_dishonesty_proxy where isusered = '" + istatus + "'");
+        }
         if (map == null) {
-            System.out.println("*************************************************************************************");
-            System.out.println("****************************代理已用光,重置所有代理状态为可用****************************");
-            System.out.println("*************************************************************************************");
-            ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
-            //getProxy(istatus);
-            map = ConnUtil.getInstance().executeQueryForMap("select * from cred_dishonesty_proxy where isusered = '" + istatus + "'");
+            throw new InterruptedException("****************************代理已用光****************************");
         }
         proxyUrl = (String) map.get("PROXYURL");
-        ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 1 where proxyurl = '" + proxyUrl + "'");
+        connUtil.executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 1 where proxyurl = '" + proxyUrl + "'");
         return proxyUrl;
     }
 
@@ -164,18 +180,20 @@ public class DishonestyService {
      * @throws SQLException
      * @throws InterruptedException
      */
-    public void changeProxy(HttpUtil httpUtil) throws SQLException, InterruptedException {
-        if ("null:0".equals(httpUtil.getProxyURL())) {
-            System.out.println(DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":重复访问出错,无代理不更换，休眠30分钟。");
-            Thread.sleep(1000 * 60 * 30);
+    public HttpUtil changeProxy(HttpUtil httpUtil) throws SQLException, InterruptedException {
+        if (!httpUtil.isProxy()) {
+            logger.info("重复访问出错,无代理不更换，休眠1分钟。");
+            Thread.sleep(1000 * 60 * 1);
+            httpUtil = new HttpUtil();
         } else {
-            System.out.println(DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":重复访问出错,更换前代理:" + httpUtil.getProxyURL());
+            logger.info("重复访问出错,更换前代理:" + httpUtil.getProxyURL());
             Thread.sleep(1000 * 60 * 1);
             String currentProxy = httpUtil.getProxyURL();
-            ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 2 where proxyurl = '" + currentProxy + "'");
-            httpUtil.setProxyURL(getProxy(0));
-            System.out.println(DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":重复访问出错,更换后代理:" + httpUtil.getProxyURL());
+            connUtil.executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 2 where proxyurl = '" + currentProxy + "'");
+            httpUtil = new HttpUtil(true, getProxy(0));
+            logger.info("重复访问出错,更换后代理:" + httpUtil.getProxyURL());
         }
+        return httpUtil;
     }
 
     /**
@@ -184,22 +202,31 @@ public class DishonestyService {
     public List getPageList(HttpUtil httpUtil, String cardNum, String pageNum) throws ParserException, IOException, InterruptedException, SQLException {
         String s = getPageHtml(httpUtil, cardNum, pageNum);
         List arrayList = getIDList(s);
+        if (arrayList.size() == 0) {
+            logger.error("获取页面信息错误,idlist:" + arrayList + ",网页内容：" + s, new GetDateException("获取页面信息错误，获取id列表为空"));
+            getPageList(httpUtil, cardNum, pageNum);
+        }
         return arrayList;
     }
 
-    public String getPageHtml(HttpUtil httpUtil, String cardNum, String pageNum) throws InterruptedException, SQLException, IOException {
+    public String getPageHtml(HttpUtil httpUtil, String cardNum, String pageNum) throws InterruptedException, SQLException, IOException, ParserException {
         sendTime = 0;
-        String s;
+        String code = httpUtil.getCode();
         if (code == null || "".equals(code)) {
             code = getImageCode(httpUtil);
         }
-        s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
+        String s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
         while (sendTime < maxTime && (s == null || s.contains("验证码错误"))) {
-            System.out.println(DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":getPageList验证码错误,发送次数：" + sendTime + ",cardNum:" + cardNum + ",pageNum:" + pageNum + ",code:" + code);
+            logger.info("验证码错误,发送次数：" + sendTime + ",cardNum:" + cardNum + ",pageNum:" + pageNum + ",code:" + code);
             Thread.currentThread().sleep(1000 * 5);
             code = getImageCode(httpUtil);
             s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
             sendTime++;
+        }
+        if (s.contains("验证码错误")) {
+            //changeProxy(httpUtil);
+            logger.error("获取验证码错误，回调本方法！");
+            s = this.getPageHtml(httpUtil, cardNum, pageNum);
         }
         return s;
     }
@@ -207,18 +234,19 @@ public class DishonestyService {
     /**
      * 获取并存储具体失信人信息
      */
-    public void saveDishoney(String saveid, HttpUtil httpUtil, String cardNum) throws InterruptedException, IOException, SQLException {
+    public int saveDishoney(String saveid, HttpUtil httpUtil, String cardNum) throws InterruptedException, IOException, SQLException {
         sendTime = 0;
         String idInfo = "";
         Map map = new HashMap();
         map.put("id", saveid);
+        String code = httpUtil.getCode();
         if (code == null || "".equals(code)) {
             code = getImageCode(httpUtil);
         }
         map.put("pCode", code);
         idInfo = httpUtil.doGetString("http://shixin.court.gov.cn/findDetai", map);
         while (sendTime < maxTime && (idInfo == null || !idInfo.startsWith("{"))) {
-            System.out.println(DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":saveDishoney,发送次数：" + sendTime + ",map:" + map + ",idInfo:" + idInfo);
+            logger.info("saveDishoney,发送次数：" + sendTime + ",map:" + map + ",idInfo:" + idInfo);
             Thread.currentThread().sleep(1000 * 5);
             code = getImageCode(httpUtil);
             map.put("pCode", code);
@@ -232,9 +260,7 @@ public class DishonestyService {
         JSONObject json = null;
         try {
             json = JSONObject.fromObject(idInfo);
-        } catch (JSONException jsonE) {
-            System.out.println(idInfo);
-            changeProxy(httpUtil);
+        } catch (JSONException jsonex) {
             saveDishoney(saveid, httpUtil, cardNum);
         }
         Integer iid = json.optInt("id");
@@ -282,39 +308,72 @@ public class DishonestyService {
                 " SDUTY, SPERFORMANCE, SPERFORMEDPART, SUNPERFORMPART, SDISRUPTTYPENAME, DPUBLISHDATE, SPARTYTYPENAME, SGISTID, SGISTUNIT) " +
                 "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         try {
-            ConnUtil.getInstance().psAdd(sql, list);
-        } catch (SQLException e) {
-            System.out.println(Thread.currentThread().getName() + ",saveid:" + saveid + ":idInfo" + idInfo + ",getProxyURL:" + httpUtil.getProxyURL());
-            e.printStackTrace();
+            connUtil.psAdd(sql, list);
+        } catch (SQLException sqlEx) {
+            String queryIdSql = "select * from CRED_DISHONESTY_PERSON where iid = '" + saveid + "'";
+            List resultlist = ConnUtil.getInstance().executeQueryForList(queryIdSql);
+            if (resultlist != null && resultlist.size() > 0) {
+                return 0;
+            } else {
+                logger.error("saveid:" + saveid + ",proxyURL:" + httpUtil.getProxyURL() + ",list:" + list);
+                logger.error("失信人信息存储数据错误：", sqlEx);
+            }
         }
-    }
-
-    public void saveAllCount(String cardNum, String account) throws SQLException {
-        String sql = "update cred_dishonesty_log set allcount = '" + account + "' where cardnum = '" + cardNum + "'";
-        ConnUtil.getInstance().executeSaveOrUpdate(sql);
+        return 1;
     }
 
     /**
      * 获取待执行任务列表
-     * @param hostNameLimit
-     * @param hostName
+     *
      * @return
      * @throws SQLException
      */
-    public List getExeList(boolean hostNameLimit,String hostName) throws SQLException {
-        String querySql = "select * from cred_dishonesty_log where result is null order by to_number(startpage) desc";
-        if (hostNameLimit) {
-            querySql = "select * from cred_dishonesty_log where result is null and hostname = '" + hostName + "' order by to_number(startpage) desc";
-        }
-        List list = ConnUtil.getInstance().executeQueryForList(querySql);
+    public List getExeList(String querySql) throws SQLException {
+        List list = connUtil.executeQueryForList(querySql);
         return list;
     }
 
     /**
      * 重置代理表状态，修改正在使用状态的代理为未使用。
+     *
      * @throws SQLException
      */
     public void resetProxy() throws SQLException {
-        ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
+        connUtil.executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
+    }
+
+    /**
+     * 获取最大个数
+     *
+     * @param httpUtil
+     * @param cardNum
+     * @param pageNum
+     * @throws InterruptedException
+     * @throws SQLException
+     * @throws IOException
+     */
+    public String saveLastCount(HttpUtil httpUtil, String cardNum, String pageNum) throws InterruptedException, SQLException, IOException, ParserException {
+        String s = getPageHtml(httpUtil, cardNum, pageNum);
+        String account = getPageAccount(s);
+        String sql = "update cred_dishonesty_log set allcount = '" + account + "' where cardnum = '" + cardNum + "'";
+        connUtil.executeSaveOrUpdate(sql);
+        return account;
+    }
+
+    /**
+     * 获取最大页数
+     *
+     * @param httpUtil
+     * @param cardNum
+     * @throws InterruptedException
+     * @throws SQLException
+     * @throws IOException
+     */
+    public int saveLastMaxPageNum(HttpUtil httpUtil, String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
+        String s = getPageHtml(httpUtil, cardNum, "0");
+        int maxPageNum = getMaxPage(s);
+        String sql = "update cred_dishonesty_log set endpage = '" + maxPageNum + "' where cardnum = '" + cardNum + "'";
+        connUtil.executeSaveOrUpdate(sql);
+        return maxPageNum;
     }
 }

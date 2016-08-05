@@ -1,8 +1,11 @@
 package com.dishonest.handler;
 
 import com.dishonest.dao.ConnUtil;
-import com.dishonest.util.DateUtil;
+import com.dishonest.util.GetDateException;
 import com.dishonest.util.HttpUtil;
+import com.dishonest.util.HttpUtilPool;
+import org.apache.http.HttpException;
+import org.apache.log4j.Logger;
 import org.htmlparser.util.ParserException;
 
 import java.io.IOException;
@@ -15,23 +18,30 @@ import java.util.List;
  * Date: 七月,2016
  */
 public class PageHandler implements Runnable {
+
+    Logger logger = Logger.getLogger(PageHandler.class);
+
+
     String cardNum;
     String pageNum;
     String hostName;
-    static int sameNum;
-    static int sucessNum;
+    int sameNum;
+    int sucessNum;
     HttpUtil httpUtil;
     int startPage;
     int endPage;
+    HttpUtilPool httpUtilPool;
 
-    public PageHandler(String cardNum, String pageNum, String hostName, HttpUtil httpUtil) {
-        this.cardNum = cardNum;
+    public PageHandler(String pageNum, String cardNum, HttpUtilPool httpUtilPool, String hostName, int sameNum, int sucessNum) throws HttpException {
         this.pageNum = pageNum;
+        this.cardNum = cardNum;
         this.hostName = hostName;
-        this.httpUtil = httpUtil;
+        this.sameNum = sameNum;
+        this.sucessNum = sucessNum;
+        this.httpUtilPool = httpUtilPool;
     }
 
-    public PageHandler(int startPage, int endPage, HttpUtil httpUtil, String cardNum, String hostName, int sameNum, int sucessNum) {
+    public PageHandler(int startPage, int endPage, HttpUtil httpUtil, String cardNum, String hostName, int sameNum, int sucessNum) throws SQLException {
         this.startPage = startPage;
         this.endPage = endPage;
         this.cardNum = cardNum;
@@ -43,95 +53,56 @@ public class PageHandler implements Runnable {
 
     @Override
     public void run() {
-        for (int i = startPage; i <= endPage; i++) {
-            work(i + "");
-            //getAllCount(i + "");
-        }
-        String logSql = "update cred_dishonesty_log set result = '1',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
-        try {
-            ConnUtil.getInstance().executeSaveOrUpdate(logSql);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
+        work();
     }
 
-    public void getAllCount(String pageNum) {
+    public void work() {
         DishonestyService dishonestyService = new DishonestyService();
         try {
-            String s = dishonestyService.getPageHtml(httpUtil, cardNum, pageNum);
-            String account = dishonestyService.getPageAccount(s);
-            System.out.println(cardNum + ":" + account);
-            dishonestyService.saveAllCount(cardNum, account);
-        } catch (IOException e) {
-            try {
-                dishonestyService.changeProxy(httpUtil);
-            } catch (SQLException e1) {
-                e1.printStackTrace();
-            } catch (InterruptedException e1) {
-                e1.printStackTrace();
-            }
-            e.printStackTrace();
-        } catch (InterruptedException e) {
-            try {
-                dishonestyService.changeProxy(httpUtil);
-            } catch (SQLException e1) {
-                e1.printStackTrace();
-            } catch (InterruptedException e1) {
-                e1.printStackTrace();
-            }
-            e.printStackTrace();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void work(String pageNum) {
-        DishonestyService dishonestyService = new DishonestyService();
-        try {
+            this.httpUtil = httpUtilPool.getHttpUtil();
             List arrayList = dishonestyService.getPageList(httpUtil, cardNum, pageNum);
-            for (int i = 0; i < arrayList.size(); i++) {
-                String saveid = arrayList.get(i).toString();
+            for (int j = 0; j < arrayList.size(); j++) {
+                String saveid = arrayList.get(j).toString();
                 String queryIdSql = "select * from CRED_DISHONESTY_PERSON where iid = '" + saveid + "'";
-                List resultlist = null;
-                try {
-                    resultlist = ConnUtil.getInstance().executeQueryForList(queryIdSql);
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
+                List resultlist = ConnUtil.getInstance().executeQueryForList(queryIdSql);
                 if (resultlist != null && resultlist.size() > 0) {
                     sameNum++;
                     continue;
                 } else {
-                    dishonestyService.saveDishoney(arrayList.get(i).toString(), httpUtil, cardNum);
-                    sucessNum++;
+                    int num = dishonestyService.saveDishoney(arrayList.get(j).toString(), httpUtil, cardNum);
+                    if (num == 0) {
+                        sameNum++;
+                    } else {
+                        sucessNum++;
+                    }
                 }
             }
-            String logStr = DateUtil.getNowDateTime() + ":" + Thread.currentThread().getName() + ":查询条件：" + cardNum + ",当前页数：" + pageNum + "，总重复个数" + sameNum + ",总成功个数：" + sucessNum + ",查询入库完成" + ",代理地址：" + httpUtil.getProxyURL();
-            System.out.println(logStr);
-            String logSql = "update cred_dishonesty_log set samenum = '" + sameNum + "',sucessnum='" + sucessNum + "', remark='" + logStr + "',startpage='" + pageNum + "',hostname='" + hostName + "',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
+            httpUtilPool.returnHttpUtil(httpUtil);
+            String logStr = "查询条件：" + cardNum + ",当前页数：" + pageNum + "，总重复个数" + sameNum + ",总成功个数：" + sucessNum + ",查询入库完成,idList:" + arrayList + ",代理地址：" + httpUtil.getProxyURL();
+            logger.info(logStr);
+            String sql = "select * from cred_dishonesty_pagelog where cardnum ='" + cardNum + "' and pagenum = '" + pageNum + "'";
+            List pagelist = dishonestyService.getExeList(sql);
+            String logSql;
+            if (pagelist != null && pagelist.size() > 0) {
+                logSql = "update cred_dishonesty_pagelog set samenum = '" + sameNum + "',sucessnum = '" + sucessNum + "' where pagenum = '" + pageNum + "' and cardnum = '" + cardNum + "'";
+            } else {
+                logSql = "insert into cred_dishonesty_pagelog (CARDNUM, PAGENUM, HOSTNAME, RESULT, DCURRENTDATE, REMARK, SAMENUM, SUCESSNUM)" +
+                        " values ( '" + cardNum + "', '" + pageNum + "', '" + hostName + "', '" + arrayList.toString() + "', sysdate, '" + logStr + "', '" + sameNum + "', '" + sucessNum + "')";
+            }
             ConnUtil.getInstance().executeSaveOrUpdate(logSql);
-        } catch (IOException e) {
-            try {
-                dishonestyService.changeProxy(httpUtil);
-            } catch (SQLException e1) {
-                e1.printStackTrace();
-            } catch (InterruptedException e1) {
-                e1.printStackTrace();
-            }
-            work(pageNum);
+        } catch (GetDateException e) {
+            logger.error("线程错误：", e);
+            throw new RuntimeException(new InterruptedException());
         } catch (InterruptedException e) {
-            try {
-                dishonestyService.changeProxy(httpUtil);
-            } catch (SQLException e1) {
-                e1.printStackTrace();
-            } catch (InterruptedException e1) {
-                e1.printStackTrace();
-            }
-            work(pageNum);
-        } catch (ParserException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
             e.printStackTrace();
         } catch (SQLException e) {
             e.printStackTrace();
+        } catch (ParserException e) {
+            e.printStackTrace();
+        }finally {
+            httpUtilPool.returnHttpUtil(httpUtil);
         }
     }
 }

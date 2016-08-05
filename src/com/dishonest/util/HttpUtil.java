@@ -20,6 +20,7 @@ import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import org.apache.log4j.Logger;
 
 import java.io.IOException;
 import java.util.*;
@@ -32,6 +33,9 @@ import java.util.*;
  * To change this template use File | Settings | File Templates.
  */
 public class HttpUtil {
+
+    Logger logger = Logger.getLogger(HttpUtil.class);
+
     boolean isProxy = false;
     String proxyURL;
     int proxyPort;
@@ -39,7 +43,17 @@ public class HttpUtil {
     private String cookies = null;
     private HttpClient httpClient;
     private int sendTimes = 0;
-    private int maxTimes = 1;
+    private int maxTimes = 3;
+
+    private String code;
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
 
     public HttpUtil(boolean isProxy, String proxyURL) {
         this.isProxy = isProxy;
@@ -54,6 +68,10 @@ public class HttpUtil {
 
     public String getProxyURL() {
         return proxyURL + ":" + proxyPort;
+    }
+
+    public boolean isProxy() {
+        return isProxy;
     }
 
     public void setProxyURL(String proxyURL) {
@@ -78,8 +96,8 @@ public class HttpUtil {
         object = doGet(url, params);
         sendTimes = 0;
         while (sendTimes < maxTimes && object == null) {
-            System.out.println("url:"+url+" :发送错误，重新发起。");
-            Thread.sleep(1000*5);
+            logger.info("url:" + url + " :发送错误，重新发起。");
+            Thread.sleep(1000 * 5);
             object = doGet(url, params);
             sendTimes++;
         }
@@ -87,18 +105,17 @@ public class HttpUtil {
     }
 
     public byte[] doGetByte(String url, Map params) throws InterruptedException, ClassCastException {
-        Object object;
-        object = doGet(url, params);
+        Object object = doGet(url, params);
         sendTimes = 0;
-        while (sendTimes < maxTimes && (object == null || object instanceof String)) {
-            System.out.println("url:"+url+" :发送错误，重新发起。");
-            Thread.sleep(1000*5);
+        while (sendTimes<100 && (object == null || object instanceof String || ((byte[]) object).length == 0)) {
+            logger.info("url:" + url + " :发送错误，休眠5s，重新发起。sendTimes:"+sendTimes);
+            Thread.sleep(1000 * 5);
             object = doGet(url, params);
             sendTimes++;
         }
-        if ((object == null || object instanceof String)){
-            return null;
-        }else{
+        if ((object == null || object instanceof String)) {
+            throw new InterruptedException("获取验证码错误，结束线程！");
+        } else {
             return (byte[]) object;
         }
     }
@@ -108,12 +125,11 @@ public class HttpUtil {
         for (int i = 0; i < paramlist.length / 2; i++) {
             map.put(paramlist[i * 2].toString(), paramlist[i * 2 + 1]);
         }
-        Object object;
-        object = doPost(url, map);
+        Object object = doPost(url, map);
         sendTimes = 0;
         while (sendTimes <= maxTimes && object == null) {
-            System.out.println("url:"+url+" :发送错误，重新发起。");
-            Thread.sleep(1000*5);
+            logger.info("url:" + url + " :发送错误，休眠5秒，重新发起。");
+            Thread.sleep(1000 * 5);
             object = doPost(url, map);
             sendTimes++;
         }
@@ -138,15 +154,20 @@ public class HttpUtil {
             url += paramStr;
         }
         HttpGet httpRequest = new HttpGet(url);
-        RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(30000).setConnectionRequestTimeout(30000)
-                .setSocketTimeout(30000).build();
+        RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(30000).setConnectionRequestTimeout(30000)
+                .setSocketTimeout(30000)
+                .build();
         httpRequest.setConfig(requestConfig);
 
         if (isProxy) {
             // 依次是代理地址，代理端口号，协议类型
             HttpHost proxy = new HttpHost(proxyURL, proxyPort, "http");
-            RequestConfig config = RequestConfig.custom().setProxy(proxy).build();
+
+            RequestConfig config = RequestConfig.custom()
+                    .setProxy(proxy)
+                    .setConnectTimeout(1000*60)
+                    .setConnectionRequestTimeout(1000*60)
+                    .setSocketTimeout(1000*60).build();
             httpRequest.setConfig(config);
         }
 
@@ -171,10 +192,10 @@ public class HttpUtil {
                     result = EntityUtils.toString(entity, getcharset(httpResponse));
                 }
                 httpRequest.abort();
-                sendTimes = 0;
                 return result;
             } else {
-                errorInfo += Thread.currentThread().getName() + ":" + url + " ,doGet请求响应码：" + httpResponse.getStatusLine().getStatusCode();
+                errorInfo += "url:" + url + " ,doGet请求响应码：" + httpResponse.getStatusLine().getStatusCode();
+                logger.info(errorInfo);
             }
         } catch (ClientProtocolException e) {
             errorInfo += Thread.currentThread().getName() + ":" + url + " ,调用doGet异常：" + e.getMessage();
@@ -205,7 +226,9 @@ public class HttpUtil {
         if (isProxy) {
             // 依次是代理地址，代理端口号，协议类型
             HttpHost proxy = new HttpHost(proxyURL, proxyPort, "http");
-            RequestConfig config = RequestConfig.custom().setProxy(proxy).build();
+            RequestConfig config = RequestConfig.custom().setProxy(proxy)
+                    .setConnectTimeout(30000).setConnectionRequestTimeout(30000)
+                    .setSocketTimeout(30000).build();
             httpRequest.setConfig(config);
         }
 
@@ -224,14 +247,8 @@ public class HttpUtil {
                 /* 读返回数据 */
                 getCookies(httpResponse);
                 HttpEntity entity = httpResponse.getEntity();
-                Object result = null;
-                if (entity.getContentType().getValue().startsWith("image")) {
-                    result = EntityUtils.toByteArray(entity);
-                } else {
-                    result = EntityUtils.toString(entity, getcharset(httpResponse));
-                }
+                Object result = EntityUtils.toString(entity, getcharset(httpResponse));
                 httpRequest.abort();
-                sendTimes = 0;
                 return result;
             } else {
                 errorInfo += Thread.currentThread().getName() + ":" + url + " :" + params + ",doPost请求响应码：" + httpResponse.getStatusLine().getStatusCode();
@@ -293,7 +310,10 @@ public class HttpUtil {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        HttpUtil httpUtil = new HttpUtil(true, "120.52.72.21:80");
+        do{
+            HttpUtil httpUtil = new HttpUtil();
+            System.out.println(((byte[])httpUtil.doGet("http://shixin.court.gov.cn/image.jsp",null)).length);
+        } while (true);
     }
 
 }

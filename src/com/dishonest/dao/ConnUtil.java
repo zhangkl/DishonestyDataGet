@@ -42,7 +42,6 @@ public class ConnUtil {
 
     public static void main(String[] args) throws SQLException {
         Map map = ConnUtil.getInstance().executeQueryForMap("select * from cred_dishonesty_proxy where isusered = 1");
-        System.out.println(map == null);
     }
 
     public Statement creatStatement() {

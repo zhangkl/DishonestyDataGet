@@ -1,8 +1,10 @@
 package com;
 
-import com.dishonest.dao.ConnUtil;
-import com.dishonest.handler.PageHandler;
-import com.dishonest.util.HttpUtil;
+import com.dishonest.handler.DBLogHandler;
+import com.dishonest.handler.DishonestyService;
+import com.dishonest.handler.HelpBatch;
+import com.dishonest.util.HttpUtilPool;
+import org.apache.http.HttpException;
 
 import java.sql.SQLException;
 import java.util.Iterator;
@@ -13,20 +15,24 @@ import java.util.concurrent.Executors;
 
 public class MainForGetLog {
 
-    public static void main(String[] args) throws SQLException, InterruptedException {
+    public static void main(String[] args) throws SQLException, InterruptedException, HttpException {
         MainForGetLog main_forGetLog = new MainForGetLog();
         main_forGetLog.worker();
     }
 
-    public void worker() throws SQLException, InterruptedException {
+    public void worker() throws SQLException, InterruptedException, HttpException {
         ExecutorService threadPool = Executors.newFixedThreadPool(10);
-        String querySql = "select * from cred_dishonesty_log where allcount is null ";
-        List list = ConnUtil.getInstance().executeQueryForList(querySql);
+        HttpUtilPool httpUtilPool = new HttpUtilPool(10, 100);
+        HelpBatch help = new HelpBatch(httpUtilPool,threadPool);
+        threadPool.execute(help);
+        String querySql = "select * from cred_dishonesty_log ";
+        DishonestyService service = new DishonestyService();
+        List list = service.getExeList(querySql);
         Iterator it = list.iterator();
         while (it.hasNext()) {
             Map map = (Map) it.next();
             String cardNum = (String) map.get("CARDNUM");
-            PageHandler pageHandler = new PageHandler(0, 0, new HttpUtil(), cardNum, "", 0, 0);
+            DBLogHandler pageHandler = new DBLogHandler("0",cardNum,httpUtilPool, "");
             threadPool.execute(pageHandler);
         }
         threadPool.shutdown();

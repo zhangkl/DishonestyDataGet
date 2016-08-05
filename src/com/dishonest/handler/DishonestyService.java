@@ -21,7 +21,6 @@ import org.htmlparser.util.ParserException;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.InterruptedIOException;
 import java.io.StringReader;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -54,12 +53,11 @@ public class DishonestyService {
         byte[] result = httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=" + System.currentTimeMillis(), null);
         while (sendTime < maxTime && (result == null || result.length == 0)) {
             logger.info("获取验证码失败，开始休眠，1分钟,发送次数:" + sendTime );
-            Thread.currentThread().sleep(1000 * 60 * 1);
             result = httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=" + System.currentTimeMillis(), null);
             sendTime++;
         }
         if (result == null || result.length == 0) {
-            throw new InterruptedIOException("获取验证码失败，线程停止。");
+            changeProxy(httpUtil);
         }
         ByteInputStream bin = new ByteInputStream();
         bin.setBuf(result);
@@ -345,17 +343,14 @@ public class DishonestyService {
     /**
      * 获取最大个数
      *
-     * @param httpUtil
      * @param cardNum
-     * @param pageNum
      * @throws InterruptedException
      * @throws SQLException
      * @throws IOException
      */
-    public String saveLastCount(HttpUtil httpUtil, String cardNum, String pageNum) throws InterruptedException, SQLException, IOException, ParserException {
-        String s = getPageHtml(httpUtil, cardNum, pageNum);
+    public String saveLastCount(String s,String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
         String account = getPageAccount(s);
-        String sql = "update cred_dishonesty_log set allcount = '" + account + "' where cardnum = '" + cardNum + "'";
+        String sql = "update cred_dishonesty_log set allcount = '" + account + "',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
         connUtil.executeSaveOrUpdate(sql);
         return account;
     }
@@ -363,14 +358,12 @@ public class DishonestyService {
     /**
      * 获取最大页数
      *
-     * @param httpUtil
      * @param cardNum
      * @throws InterruptedException
      * @throws SQLException
      * @throws IOException
      */
-    public int saveLastMaxPageNum(HttpUtil httpUtil, String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
-        String s = getPageHtml(httpUtil, cardNum, "0");
+    public int saveLastMaxPageNum(String s,String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
         int maxPageNum = getMaxPage(s);
         String sql = "update cred_dishonesty_log set endpage = '" + maxPageNum + "' where cardnum = '" + cardNum + "'";
         connUtil.executeSaveOrUpdate(sql);

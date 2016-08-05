@@ -107,9 +107,8 @@ public class HttpUtil {
     public byte[] doGetByte(String url, Map params) throws InterruptedException, ClassCastException {
         Object object = doGet(url, params);
         sendTimes = 0;
-        while (sendTimes<100 && (object == null || object instanceof String || ((byte[]) object).length == 0)) {
+        while (sendTimes<maxTimes && (object == null || object instanceof String || ((byte[]) object).length == 0)) {
             logger.info("url:" + url + " :发送错误，休眠5s，重新发起。sendTimes:"+sendTimes);
-            Thread.sleep(1000 * 5);
             object = doGet(url, params);
             sendTimes++;
         }

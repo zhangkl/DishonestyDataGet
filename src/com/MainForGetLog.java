@@ -3,6 +3,7 @@ package com;
 import com.dishonest.handler.DBLogHandler;
 import com.dishonest.handler.DishonestyService;
 import com.dishonest.handler.HelpBatch;
+import com.dishonest.util.HttpUtil;
 import com.dishonest.util.HttpUtilPool;
 import org.apache.http.HttpException;
 
@@ -21,18 +22,18 @@ public class MainForGetLog {
     }
 
     public void worker() throws SQLException, InterruptedException, HttpException {
-        ExecutorService threadPool = Executors.newFixedThreadPool(10);
+        ExecutorService threadPool = Executors.newFixedThreadPool(100);
         HttpUtilPool httpUtilPool = new HttpUtilPool(10, 100);
         HelpBatch help = new HelpBatch(httpUtilPool,threadPool);
         threadPool.execute(help);
-        String querySql = "select * from cred_dishonesty_log ";
+        String querySql = "select * from cred_dishonesty_log where dcurrentdate < to_date('2016-08-05','yyyy-mm-dd')";
         DishonestyService service = new DishonestyService();
         List list = service.getExeList(querySql);
         Iterator it = list.iterator();
         while (it.hasNext()) {
             Map map = (Map) it.next();
             String cardNum = (String) map.get("CARDNUM");
-            DBLogHandler pageHandler = new DBLogHandler("0",cardNum,httpUtilPool, "");
+            DBLogHandler pageHandler = new DBLogHandler("0",cardNum,new HttpUtil(), "");
             threadPool.execute(pageHandler);
         }
         threadPool.shutdown();

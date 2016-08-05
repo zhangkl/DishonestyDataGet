@@ -1,8 +1,6 @@
 package com.dishonest.handler;
 
-import com.dishonest.util.GetDateException;
 import com.dishonest.util.HttpUtil;
-import com.dishonest.util.HttpUtilPool;
 import org.apache.http.HttpException;
 import org.apache.log4j.Logger;
 import org.htmlparser.util.ParserException;
@@ -24,27 +22,22 @@ public class DBLogHandler implements Runnable {
     String pageNum;
     String hostName;
     HttpUtil httpUtil;
-    HttpUtilPool httpUtilPool;
 
-    public DBLogHandler(String pageNum, String cardNum, HttpUtilPool httpUtilPool, String hostName) throws HttpException {
+    public DBLogHandler(String pageNum, String cardNum, HttpUtil httpUtil, String hostName) throws HttpException {
         this.pageNum = pageNum;
         this.cardNum = cardNum;
         this.hostName = hostName;
-        this.httpUtilPool = httpUtilPool;
+        this.httpUtil = httpUtil;
     }
 
     @Override
     public void run() {
         DishonestyService dishonestyService = new DishonestyService();
-        int maxPageNum = 0;
-        String account = null;
         try {
-            this.httpUtil = httpUtilPool.getHttpUtil();
-            maxPageNum = dishonestyService.saveLastMaxPageNum(httpUtil, cardNum);
-            account = dishonestyService.saveLastCount(httpUtil, cardNum,pageNum);
-        } catch (GetDateException e) {
-            logger.error("线程错误：", e);
-            throw new RuntimeException(new InterruptedException());
+            String s = dishonestyService.getPageHtml(httpUtil,cardNum,"0");
+            int maxPageNum = dishonestyService.saveLastMaxPageNum(s, cardNum);
+            String account = dishonestyService.saveLastCount(s, cardNum);
+            logger.info("cardnum:"+cardNum+",获取最大页面:"+maxPageNum+",最大条数:"+account);
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -53,9 +46,6 @@ public class DBLogHandler implements Runnable {
             e.printStackTrace();
         } catch (ParserException e) {
             e.printStackTrace();
-        }finally {
-            httpUtilPool.returnHttpUtil(httpUtil);
         }
-        logger.info("cardnum:"+cardNum+",获取最大页面:"+maxPageNum+",最大条数:"+account);
     }
 }

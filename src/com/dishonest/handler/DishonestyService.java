@@ -57,7 +57,9 @@ public class DishonestyService {
             sendTime++;
         }
         if (result == null || result.length == 0) {
-            changeProxy(httpUtil);
+            logger.info("result 为空，回调:getImageCode");
+            httpUtil = changeProxy(httpUtil);
+            getImageCode(httpUtil);
         }
         ByteInputStream bin = new ByteInputStream();
         bin.setBuf(result);
@@ -187,7 +189,7 @@ public class DishonestyService {
             logger.info("重复访问出错,更换前代理:" + httpUtil.getProxyURL());
             Thread.sleep(1000 * 60 * 1);
             String currentProxy = httpUtil.getProxyURL();
-            connUtil.executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 2 where proxyurl = '" + currentProxy + "'");
+            connUtil.executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 1 where proxyurl = '" + currentProxy + "'");
             httpUtil = new HttpUtil(true, getProxy(0));
             logger.info("重复访问出错,更换后代理:" + httpUtil.getProxyURL());
         }
@@ -215,7 +217,7 @@ public class DishonestyService {
         }
         String s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
         while (sendTime < maxTime && (s == null || s.contains("验证码错误"))) {
-            logger.info("验证码错误,发送次数：" + sendTime + ",cardNum:" + cardNum + ",pageNum:" + pageNum + ",code:" + code);
+            logger.info("验证码错误,发送次数：" + sendTime + ",cardNum:" + cardNum + ",pageNum:" + pageNum + ",code:" + code+",代理："+httpUtil.getProxyURL());
             Thread.currentThread().sleep(1000 * 5);
             code = getImageCode(httpUtil);
             s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);

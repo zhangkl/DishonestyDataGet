@@ -2,9 +2,7 @@ package com;
 
 import com.dishonest.handler.DBLogHandler;
 import com.dishonest.handler.DishonestyService;
-import com.dishonest.handler.HelpBatch;
 import com.dishonest.util.HttpUtil;
-import com.dishonest.util.HttpUtilPool;
 import org.apache.http.HttpException;
 
 import java.sql.SQLException;
@@ -22,11 +20,11 @@ public class MainForGetLog {
     }
 
     public void worker() throws SQLException, InterruptedException, HttpException {
-        ExecutorService threadPool = Executors.newFixedThreadPool(100);
-        HttpUtilPool httpUtilPool = new HttpUtilPool(10, 100);
-        HelpBatch help = new HelpBatch(httpUtilPool,threadPool);
-        threadPool.execute(help);
-        String querySql = "select * from cred_dishonesty_log where dcurrentdate < to_date('2016-08-05','yyyy-mm-dd')";
+        ExecutorService threadPool = Executors.newFixedThreadPool(8);
+        /*HttpUtilPool httpUtilPool = new HttpUtilPool(1, 7);*/
+        /*HelpBatch help = new HelpBatch(httpUtilPool,threadPool);
+        threadPool.execute(help);*/
+        String querySql = "select * from cred_dishonesty_log where dcurrentdate < to_date('2016-08-08','yyyy-mm-dd')";
         DishonestyService service = new DishonestyService();
         List list = service.getExeList(querySql);
         Iterator it = list.iterator();

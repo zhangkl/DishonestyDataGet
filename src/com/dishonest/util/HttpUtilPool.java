@@ -25,8 +25,26 @@ public class HttpUtilPool {
     private int maxSendTime = 5;
     private long waitTime = 5000;
 
-    public HttpUtilPool(int noProxySize, int initial) throws SQLException, InterruptedException {
-        initializePool(noProxySize, initial);
+    public HttpUtilPool(int myProxyNum, int initial) throws SQLException, InterruptedException {
+        int temp = initial/myProxyNum;
+        for (int i = 0; i < temp; i++) {
+            HttpUtil httpUtil = new HttpUtil();
+            connections.put(httpUtil, Boolean.FALSE);
+        }
+        for (int i = 0; i < temp; i++) {
+            for (int j = 0; j < 6; j++) {
+                HttpUtil httpUtil = new HttpUtil(true, "127.0.0.1:108" + j);
+                connections.put(httpUtil, Boolean.FALSE);
+            }
+        }
+    }
+
+    public HttpUtilPool(int proxyNum) throws SQLException, InterruptedException {
+        DishonestyService ds = new DishonestyService();
+        for (int i = 0; i < proxyNum; i++) {
+            HttpUtil httpUtil = new HttpUtil(true,ds.getProxy(0));
+            connections.put(httpUtil,false);
+        }
     }
 
     public HttpUtil getHttpUtil() throws GetDateException {
@@ -65,20 +83,36 @@ public class HttpUtilPool {
     }
 
     private void initializePool(int noProxySize, int initial) throws SQLException, InterruptedException {
-        DishonestyService service = new DishonestyService();
-        int noProxy = 0;
+        /*for (int i = 0; i < initial; i++) {
+                HttpUtil httpUtil = new HttpUtil(true, "127.0.0.1:1080");
+                connections.put(httpUtil, Boolean.FALSE);
+        }
         for (int i = 0; i < initial; i++) {
+            HttpUtil httpUtil = new HttpUtil();
+            connections.put(httpUtil, Boolean.FALSE);
+        }*/
+        noProxySize = initial/7;
+        for (int i = 0; i < noProxySize; i++) {
+            HttpUtil httpUtil = new HttpUtil();
+            connections.put(httpUtil, Boolean.FALSE);
+        }
+        for (int i = 0; i < noProxySize; i++) {
+            for (int j = 0; j < 6; j++) {
+                HttpUtil httpUtil = new HttpUtil(true, "127.0.0.1:108" + j);
+                connections.put(httpUtil, Boolean.FALSE);
+            }
+        }
+
+        /*for (int i = 0; i < initial; i++) {
             if (noProxy < noProxySize) {
-                HttpUtil httpUtil = new HttpUtil();
+                HttpUtil httpUtil = new HttpUtil(true, "127.0.0.1:1080");
                 connections.put(httpUtil, Boolean.FALSE);
                 noProxy++;
             } else {
                 HttpUtil httpUtil = new HttpUtil(true, service.getProxy(0));
                 connections.put(httpUtil, Boolean.FALSE);
             }
-            /*HttpUtil httpUtil = new HttpUtil(true,"tky.jp.v0.ss-fast.com:873");
-            connections.put(httpUtil, Boolean.FALSE);*/
-        }
+        }*/
     }
 
     public void getStatus() {
@@ -93,31 +127,22 @@ public class HttpUtilPool {
                 falseNum++;
             }
         }
-        logger.info("当前httpPool中空闲个数：" + trueNum + ",在用个数：" + falseNum);
+        logger.info("当前httpPool中空闲个数：" + falseNum + ",在用个数：" + trueNum);
     }
 
     public static void main(String[] args) throws SQLException, InterruptedException, GetDateException {
-        /*HttpUtilPool hp = new HttpUtilPool(10, 10);
-        HttpUtil httputil = hp.getHttpUtil();
-        hp.getHttpUtil();
+        HttpUtilPool hp = new HttpUtilPool(0, 7);
         hp.getStatus();
-        hp.returnHttpUtil(httputil);
-        hp.getStatus();*/
-        Integer a = 1;
-        Integer b = 2;
-        Integer c = 3;
-        Integer d = 3;
-        Integer e = 321;
-        Integer f = 321;
-        Long g = 3L;
-        Long h = 2L;
+        Enumeration enu = hp.connections.keys();
+        while (enu.hasMoreElements()) {
+            HttpUtil httpUtil = (HttpUtil) enu.nextElement();
+            if (true == hp.connections.get(httpUtil)) {
 
-        System.out.println(c == d);  //true
-        System.out.println(e == f);  //false
-        System.out.println(c == (a + b));//true
-        System.out.println(c.equals(a + b)); //true
-        System.out.println(g == (a + b));//   true
-        System.out.println(g.equals(a + b));// false
-        System.out.println(g.equals(a + h)); //ture
+            } else {
+                String s = (String) httpUtil.doGet("www.baidu.com",null);
+                System.out.println(httpUtil.getProxyURL()+":"+s);
+            }
+        }
+
     }
 }

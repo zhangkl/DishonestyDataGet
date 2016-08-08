@@ -28,17 +28,18 @@ public class MainForLess {
     }
 
     public static void main(String[] args) throws SQLException, InterruptedException, HttpException {
-        MainForLess main = new MainForLess(5, System.getenv("COMPUTERNAME"), false);
+        MainForLess main = new MainForLess(50, "zhangkl", true);
         main.worker();
     }
 
     public void worker() throws HttpException, InterruptedException, SQLException {
         ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
-        HttpUtilPool httpUtilPool = new HttpUtilPool(5, threadPoolSize);
+        HttpUtilPool httpUtilPool = new HttpUtilPool(threadPoolSize);
+
         DishonestyService service = new DishonestyService();
-        String querySql = "select * from cred_dishonesty_pagelog t where t.samenum + t.sucessnum < 10";
+        String querySql = "select * from cred_dishonesty_log t where to_number(t.startpage) < to_number(t.endpage)";
         if (hostNameLimit) {
-            querySql = "select * from cred_dishonesty_pagelog t where t.samenum + t.sucessnum < 10 and hostname = '" + hostName + "'";
+            querySql += "and hostname = '" + hostName + "'";
         }
         List list = service.getExeList(querySql);
         service.resetProxy();
@@ -46,9 +47,17 @@ public class MainForLess {
         while (it.hasNext()) {
             Map map = (Map) it.next();
             String cardNum = (String) map.get("CARDNUM");
-            String pageNum = (String) map.get("PAGENUM");
-            PageHandler pageHandler = new PageHandler(pageNum, cardNum, httpUtilPool, hostName, 0, 0);
-            threadPool.execute(pageHandler);
+            int endpage = Integer.valueOf((String) map.get("ENDPAGE"));
+            int startpage = 1;
+            for (int i = startpage; i <= endpage; i++) {
+                String sql = "select * from cred_dishonesty_pagelog where cardnum ='" + cardNum + "' and pagenum = '" + i + "'";
+                List pagelist = service.getExeList(sql);
+                if (pagelist != null && pagelist.size() > 0) {
+                    continue;
+                }
+                PageHandler pageHandler = new PageHandler(i+"", cardNum, httpUtilPool, hostName, 0, 0);
+                threadPool.execute(pageHandler);
+            }
         }
         threadPool.shutdown();
     }

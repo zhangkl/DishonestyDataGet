@@ -35,6 +35,8 @@ import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Created with IntelliJ IDEA.
@@ -50,6 +52,12 @@ public class ProxyHandler implements Runnable {
 
     String proxyurl;
 
+    public ProxyHandler(HttpUtil httpUtil) {
+        this.httpUtil = httpUtil;
+    }
+
+    HttpUtil httpUtil;
+
     public ProxyHandler(String proxyurl) {
         this.proxyurl = proxyurl;
     }
@@ -59,33 +67,36 @@ public class ProxyHandler implements Runnable {
     }
 
     public static void main(String[] args) throws SQLException {
-        try {
+        /*try {
             ProxyHandler proxyHandler = new ProxyHandler();
-            proxyHandler.getProxy("http://www.youdaili.net/Daili/http/4786.html");
+            proxyHandler.getProxy("http://www.youdaili.net/Daili/http/4789.html");
         } catch (ParserException e) {
             e.printStackTrace();
-        }
-        /*ExecutorService executorService = Executors.newFixedThreadPool(5);
+        }*/
+        ExecutorService executorService = Executors.newFixedThreadPool(5);
         try {
+            for (int i = 0; i < 6; i++) {
+                ProxyHandler proxyHandler = new ProxyHandler("127.0.0.1:108"+i);
+                executorService.execute(proxyHandler);
+            }
             List list = ConnUtil.getInstance().executeQueryForList("select * from cred_dishonesty_proxy where isusered != 2");
             Iterator iterator = list.iterator();
             while (iterator.hasNext()) {
                 Map map = (Map) iterator.next();
                 String proxyurl = (String) map.get("PROXYURL");
                 ProxyHandler proxyHandler = new ProxyHandler(proxyurl);
-
                 executorService.execute(proxyHandler);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-        executorService.shutdown();*/
+        executorService.shutdown();
     }
 
     @Override
     public void run() {
         try {
-            checkProxy("http://www.baidu.com");
+            checkProxy("http://shixin.court.gov.cn/image.jsp");
         } catch (SQLException e) {
             e.printStackTrace();
         }
@@ -138,7 +149,7 @@ public class ProxyHandler implements Runnable {
             System.out.println(proxyurl+e.getMessage());
             status =  0;
         }
-        if (status != 200 && status != 403 && status != 500) {
+        if (status != 403) {
             ConnUtil.getInstance().executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 2 where proxyurl = '" + proxyurl + "'");
         }
     }

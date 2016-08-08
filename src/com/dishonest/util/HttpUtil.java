@@ -113,7 +113,7 @@ public class HttpUtil {
             sendTimes++;
         }
         if ((object == null || object instanceof String)) {
-            throw new InterruptedException("获取验证码错误，结束线程！");
+            return null;
         } else {
             return (byte[]) object;
         }

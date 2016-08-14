@@ -24,7 +24,7 @@ public class MainForGetLog {
         /*HttpUtilPool httpUtilPool = new HttpUtilPool(1, 7);*/
         /*HelpBatch help = new HelpBatch(httpUtilPool,threadPool);
         threadPool.execute(help);*/
-        String querySql = "select * from cred_dishonesty_log where dcurrentdate < to_date('2016-08-08','yyyy-mm-dd')";
+        String querySql = "select * from cred_dishonesty_log where dcurrentdate < to_date('2016-08-13','yyyy-mm-dd')";
         DishonestyService service = new DishonestyService();
         List list = service.getExeList(querySql);
         Iterator it = list.iterator();

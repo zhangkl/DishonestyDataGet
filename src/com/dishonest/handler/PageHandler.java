@@ -31,14 +31,16 @@ public class PageHandler implements Runnable {
     int startPage;
     int endPage;
     HttpUtilPool httpUtilPool;
+    DishonestyService dishonestyService;
 
-    public PageHandler(String pageNum, String cardNum, HttpUtilPool httpUtilPool, String hostName, int sameNum, int sucessNum) throws HttpException {
+    public PageHandler(String pageNum, String cardNum, HttpUtilPool httpUtilPool, String hostName, int sameNum, int sucessNum,DishonestyService dishonestyService ) throws HttpException {
         this.pageNum = pageNum;
         this.cardNum = cardNum;
         this.hostName = hostName;
         this.sameNum = sameNum;
         this.sucessNum = sucessNum;
         this.httpUtilPool = httpUtilPool;
+        this.dishonestyService = dishonestyService;
     }
 
     public PageHandler(int startPage, int endPage, HttpUtil httpUtil, String cardNum, String hostName, int sameNum, int sucessNum) throws SQLException {
@@ -57,7 +59,6 @@ public class PageHandler implements Runnable {
     }
 
     public void work() {
-        DishonestyService dishonestyService = new DishonestyService();
         try {
             this.httpUtil = httpUtilPool.getHttpUtil();
             List arrayList = dishonestyService.getPageList(httpUtil, cardNum, pageNum);

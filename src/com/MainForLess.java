@@ -1,64 +1,37 @@
 package com;
 
-import com.dishonest.handler.DishonestyService;
-import com.dishonest.handler.PageHandler;
+import com.dishonest.handler.HelpBatch;
+import com.dishonest.util.GetDateException;
 import com.dishonest.util.HttpUtilPool;
 import org.apache.http.HttpException;
 import org.apache.log4j.Logger;
 
 import java.sql.SQLException;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class MainForLess {
 
     Logger logger = Logger.getLogger(MainForLess.class);
 
-    int threadPoolSize;
-    String hostName;
-    boolean hostNameLimit;
+    public static void main(String[] args) throws SQLException, InterruptedException, HttpException, GetDateException {
+        ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
+        HelpBatch helpBatch = new HelpBatch();
+        ses.scheduleAtFixedRate(helpBatch,0,10,TimeUnit.MINUTES);
 
-    public MainForLess(int threadPoolSize, String hostName, boolean hostNameLimit) {
-        this.threadPoolSize = threadPoolSize;
-        this.hostName = hostName;
-        this.hostNameLimit = hostNameLimit;
+        /*int pageNum = 0;
+        for (int i = 0; i < 5; i++) {
+            pageNum++;
+            HttpUtilPool httpUtilPool = new HttpUtilPool(3);
+            Main main = new Main(3, "zhangkl", httpUtilPool,pageNum);
+            Thread thread = new Thread(main);
+            thread.start();
+        }*/
+        HttpUtilPool httpUtilPool = new HttpUtilPool(10);
+        Main main = new Main(10, System.getenv("COMPUTERNAME"), httpUtilPool,0);
+        Thread thread = new Thread(main);
+        thread.start();
     }
 
-    public static void main(String[] args) throws SQLException, InterruptedException, HttpException {
-        MainForLess main = new MainForLess(50, "zhangkl", true);
-        main.worker();
-    }
-
-    public void worker() throws HttpException, InterruptedException, SQLException {
-        ExecutorService threadPool = Executors.newFixedThreadPool(threadPoolSize);
-        HttpUtilPool httpUtilPool = new HttpUtilPool(threadPoolSize);
-
-        DishonestyService service = new DishonestyService();
-        String querySql = "select * from cred_dishonesty_log t where to_number(t.startpage) < to_number(t.endpage)";
-        if (hostNameLimit) {
-            querySql += "and hostname = '" + hostName + "'";
-        }
-        List list = service.getExeList(querySql);
-        service.resetProxy();
-        Iterator it = list.iterator();
-        while (it.hasNext()) {
-            Map map = (Map) it.next();
-            String cardNum = (String) map.get("CARDNUM");
-            int endpage = Integer.valueOf((String) map.get("ENDPAGE"));
-            int startpage = 1;
-            for (int i = startpage; i <= endpage; i++) {
-                String sql = "select * from cred_dishonesty_pagelog where cardnum ='" + cardNum + "' and pagenum = '" + i + "'";
-                List pagelist = service.getExeList(sql);
-                if (pagelist != null && pagelist.size() > 0) {
-                    continue;
-                }
-                PageHandler pageHandler = new PageHandler(i+"", cardNum, httpUtilPool, hostName, 0, 0);
-                threadPool.execute(pageHandler);
-            }
-        }
-        threadPool.shutdown();
-    }
 }

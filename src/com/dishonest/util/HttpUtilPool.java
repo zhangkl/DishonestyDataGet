@@ -10,6 +10,7 @@
 package com.dishonest.util;
 
 import com.dishonest.handler.DishonestyService;
+import org.apache.http.HttpException;
 import org.apache.log4j.Logger;
 
 import java.sql.SQLException;
@@ -26,23 +27,24 @@ public class HttpUtilPool {
     private long waitTime = 5000;
 
     public HttpUtilPool(int myProxyNum, int initial) throws SQLException, InterruptedException {
-        int temp = initial/myProxyNum;
-        for (int i = 0; i < temp; i++) {
-            HttpUtil httpUtil = new HttpUtil();
-            connections.put(httpUtil, Boolean.FALSE);
-        }
-        for (int i = 0; i < temp; i++) {
-            for (int j = 0; j < 6; j++) {
-                HttpUtil httpUtil = new HttpUtil(true, "127.0.0.1:108" + j);
-                connections.put(httpUtil, Boolean.FALSE);
-            }
+        DishonestyService ds = new DishonestyService();
+        for (int i = 0; i < initial; i++) {
+             HttpUtil httpUtil = new HttpUtil(true,ds.getProxy(0));
+            connections.put(httpUtil,false);
         }
     }
 
     public HttpUtilPool(int proxyNum) throws SQLException, InterruptedException {
+        for (int i = 0; i < proxyNum; i++) {
+            HttpUtil httpUtil = new HttpUtil();
+            connections.put(httpUtil,false);
+        }
+    }
+
+    public HttpUtilPool(int proxyNum,String proxyUrl) throws SQLException, InterruptedException {
         DishonestyService ds = new DishonestyService();
         for (int i = 0; i < proxyNum; i++) {
-            HttpUtil httpUtil = new HttpUtil(true,ds.getProxy(0));
+            HttpUtil httpUtil = new HttpUtil(true,proxyUrl);
             connections.put(httpUtil,false);
         }
     }
@@ -83,14 +85,7 @@ public class HttpUtilPool {
     }
 
     private void initializePool(int noProxySize, int initial) throws SQLException, InterruptedException {
-        /*for (int i = 0; i < initial; i++) {
-                HttpUtil httpUtil = new HttpUtil(true, "127.0.0.1:1080");
-                connections.put(httpUtil, Boolean.FALSE);
-        }
-        for (int i = 0; i < initial; i++) {
-            HttpUtil httpUtil = new HttpUtil();
-            connections.put(httpUtil, Boolean.FALSE);
-        }*/
+
         noProxySize = initial/7;
         for (int i = 0; i < noProxySize; i++) {
             HttpUtil httpUtil = new HttpUtil();
@@ -102,17 +97,6 @@ public class HttpUtilPool {
                 connections.put(httpUtil, Boolean.FALSE);
             }
         }
-
-        /*for (int i = 0; i < initial; i++) {
-            if (noProxy < noProxySize) {
-                HttpUtil httpUtil = new HttpUtil(true, "127.0.0.1:1080");
-                connections.put(httpUtil, Boolean.FALSE);
-                noProxy++;
-            } else {
-                HttpUtil httpUtil = new HttpUtil(true, service.getProxy(0));
-                connections.put(httpUtil, Boolean.FALSE);
-            }
-        }*/
     }
 
     public void getStatus() {
@@ -121,7 +105,8 @@ public class HttpUtilPool {
         int falseNum = 0;
         while (enu.hasMoreElements()) {
             HttpUtil httpUtil = (HttpUtil) enu.nextElement();
-            if (true == connections.get(httpUtil)) {
+            boolean flag = (Boolean) connections.get(httpUtil);
+            if (flag) {
                 trueNum++;
             } else {
                 falseNum++;
@@ -130,19 +115,8 @@ public class HttpUtilPool {
         logger.info("当前httpPool中空闲个数：" + falseNum + ",在用个数：" + trueNum);
     }
 
-    public static void main(String[] args) throws SQLException, InterruptedException, GetDateException {
-        HttpUtilPool hp = new HttpUtilPool(0, 7);
-        hp.getStatus();
-        Enumeration enu = hp.connections.keys();
-        while (enu.hasMoreElements()) {
-            HttpUtil httpUtil = (HttpUtil) enu.nextElement();
-            if (true == hp.connections.get(httpUtil)) {
-
-            } else {
-                String s = (String) httpUtil.doGet("www.baidu.com",null);
-                System.out.println(httpUtil.getProxyURL()+":"+s);
-            }
-        }
-
+    public static void main(String[] args) throws HttpException, SQLException, GetDateException, InterruptedException {
+        Object i = 1;
+        System.out.println(String.valueOf(i));
     }
 }

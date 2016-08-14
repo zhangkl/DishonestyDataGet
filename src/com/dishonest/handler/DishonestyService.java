@@ -52,7 +52,6 @@ public class DishonestyService {
     public String getImageCode(HttpUtil httpUtil) throws IOException, InterruptedException, SQLException {
         byte[] result = httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=" + System.currentTimeMillis(), null);
         while (sendTime < maxTime && (result == null || result.length == 0)) {
-            logger.info("获取验证码失败，开始休眠，1分钟,发送次数:" + sendTime );
             result = httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=" + System.currentTimeMillis(), null);
             sendTime++;
         }
@@ -157,14 +156,14 @@ public class DishonestyService {
      * @return
      * @throws SQLException
      */
-    public synchronized String getProxy(int istatus) throws SQLException, InterruptedException {
+    public String getProxy(int istatus) throws SQLException, InterruptedException {
         String proxyUrl;
         Map map = connUtil.executeQueryForMap("select * from cred_dishonesty_proxy where isusered = '" + istatus + "'");
         while (map == null && sendTime < maxTime) {
             sendTime++;
             logger.info("****************************代理已用光,重置所有代理状态为可用****************************");
             connUtil.executeSaveOrUpdate("update cred_dishonesty_proxy set isusered = 0 where isusered = 1");
-            map = connUtil.executeQueryForMap("select * from cred_dishonesty_proxy where isusered = '" + istatus + "'");
+            proxyUrl = getProxy(istatus);
         }
         if (map == null) {
             throw new InterruptedException("****************************代理已用光****************************");
@@ -181,7 +180,7 @@ public class DishonestyService {
      * @throws InterruptedException
      */
     public HttpUtil changeProxy(HttpUtil httpUtil) throws SQLException, InterruptedException {
-        if (!httpUtil.isProxy()) {
+        if (!httpUtil.isProxy() || httpUtil.getProxyURL().startsWith("127.0.0.1")) {
             logger.info("重复访问出错,无代理不更换，休眠1分钟。");
             Thread.sleep(1000 * 60 * 1);
             httpUtil = new HttpUtil();
@@ -217,15 +216,16 @@ public class DishonestyService {
         }
         String s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
         while (sendTime < maxTime && (s == null || s.contains("验证码错误"))) {
-            logger.info("验证码错误,发送次数：" + sendTime + ",cardNum:" + cardNum + ",pageNum:" + pageNum + ",code:" + code+",代理："+httpUtil.getProxyURL());
-            Thread.currentThread().sleep(1000 * 5);
+            logger.info("验证码错误,发送次数：" + sendTime + ",cardNum:" + cardNum + ",pageNum:" + pageNum + ",code:" + code + ",代理：" + httpUtil.getProxyURL());
+            Thread.sleep(1000*60*2);
+            httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=", null);
             code = getImageCode(httpUtil);
             s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
             sendTime++;
         }
         if (s.contains("验证码错误")) {
             //changeProxy(httpUtil);
-            logger.error("获取验证码错误，回调本方法！");
+            logger.info("获取验证码错误，回调本方法！");
             s = this.getPageHtml(httpUtil, cardNum, pageNum);
         }
         return s;
@@ -254,14 +254,19 @@ public class DishonestyService {
             sendTime++;
         }
         if (idInfo == null || !idInfo.startsWith("{")) {
-            changeProxy(httpUtil);
-            saveDishoney(saveid, httpUtil, cardNum);
+            httpUtil = changeProxy(httpUtil);
+            return saveDishoney(saveid, httpUtil, cardNum);
         }
         JSONObject json = null;
         try {
             json = JSONObject.fromObject(idInfo);
         } catch (JSONException jsonex) {
-            saveDishoney(saveid, httpUtil, cardNum);
+            return saveDishoney(saveid, httpUtil, cardNum);
+        }
+        if (json == null) {
+            logger.error("json为空：" + idInfo);
+            changeProxy(httpUtil);
+            return saveDishoney(saveid, httpUtil, cardNum);
         }
         Integer iid = json.optInt("id");
         String siname = json.optString("iname");
@@ -334,6 +339,20 @@ public class DishonestyService {
     }
 
     /**
+     * 获取待执行任务列表
+     *
+     * @return
+     * @throws SQLException
+     */
+    public List getExeListForPage(String querySql, int pageNum, int pageSize) throws SQLException {
+        String sql = "select * from ( select a.*, rownum rn from (";
+        sql += querySql + ") a where rownum <=" + pageNum * pageSize + ") where rn > " + (pageNum - 1) * pageSize;
+        List list = connUtil.executeQueryForList(sql);
+        return list;
+    }
+
+
+    /**
      * 重置代理表状态，修改正在使用状态的代理为未使用。
      *
      * @throws SQLException
@@ -350,7 +369,7 @@ public class DishonestyService {
      * @throws SQLException
      * @throws IOException
      */
-    public String saveLastCount(String s,String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
+    public String saveLastCount(String s, String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
         String account = getPageAccount(s);
         String sql = "update cred_dishonesty_log set allcount = '" + account + "',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
         connUtil.executeSaveOrUpdate(sql);
@@ -365,10 +384,26 @@ public class DishonestyService {
      * @throws SQLException
      * @throws IOException
      */
-    public int saveLastMaxPageNum(String s,String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
+    public int saveLastMaxPageNum(String s, String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
         int maxPageNum = getMaxPage(s);
         String sql = "update cred_dishonesty_log set endpage = '" + maxPageNum + "' where cardnum = '" + cardNum + "'";
         connUtil.executeSaveOrUpdate(sql);
         return maxPageNum;
+    }
+
+    public static void main(String[] args) throws SQLException {
+        String querySql = "select * from cred_dishonesty_log t where  to_number(t.startpage) < to_number(t.endpage) ";
+        querySql += "order by to_number(t.startpage) desc";
+        List list = new DishonestyService().getExeList(querySql);
+        int i = 0;
+        while (true) {
+            list.add(new Object());
+            System.out.println(list.size());
+            i++;
+            if (i % 17 == 0) {
+                i -= 17;
+            }
+            System.out.println(list.get(i));
+        }
     }
 }

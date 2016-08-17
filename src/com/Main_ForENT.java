@@ -14,9 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 
-public class Main implements Runnable {
+public class Main_ForENT implements Runnable {
 
-    Logger logger = Logger.getLogger(Main.class);
+    Logger logger = Logger.getLogger(Main_ForENT.class);
 
     int threadPoolSize;
     String hostName;
@@ -24,7 +24,7 @@ public class Main implements Runnable {
     int sqlPageNum;
     public static boolean timeFlag = true;
 
-    public Main(int threadPoolSize, String hostName, HttpUtilPool httpUtilPool, int sqlPageNum) {
+    public Main_ForENT(int threadPoolSize, String hostName, HttpUtilPool httpUtilPool, int sqlPageNum) {
         this.threadPoolSize = threadPoolSize;
         this.hostName = hostName;
         this.httpUtilPool = httpUtilPool;
@@ -34,12 +34,12 @@ public class Main implements Runnable {
     public static void main(String[] args) throws SQLException, InterruptedException, HttpException, GetDateException, ExecutionException {
         ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
         HelpBatch helpBatch = new HelpBatch();
-        ses.scheduleAtFixedRate(helpBatch, 0, 10, TimeUnit.MINUTES);
+        ses.scheduleAtFixedRate(helpBatch, 0, 60, TimeUnit.SECONDS);
         int pageNum = 0;
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 1; i++) {
             pageNum++;
-            HttpUtilPool httpUtilPool = new HttpUtilPool(5, "127.0.0.1:108" + i);
-            Main main = new Main(5, System.getenv("COMPUTERNAME"), httpUtilPool, pageNum);
+            HttpUtilPool httpUtilPool = new HttpUtilPool(3);
+            Main_ForENT main = new Main_ForENT(3, "zhangkl", httpUtilPool, pageNum);
             Thread thread = new Thread(main);
             thread.start();
         }
@@ -48,14 +48,14 @@ public class Main implements Runnable {
     public void run() {
         if (timeFlag) {
             try {
-                BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(150);
+                BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(100);
                 ExecutorService threadPool = new ThreadPoolExecutor(threadPoolSize, threadPoolSize, 0L, TimeUnit.MILLISECONDS, queue);
 
                 DishonestyService service = new DishonestyService();
-                String querySql = " select nvl(c,0), l.cardnum, l.endpage " +
-                        " from (select count(*) c, t.cardnum from cred_dishonesty_pagelog t" +
-                        " group by cardnum) r right join cred_dishonesty_log l " +
-                        "on r.cardnum = l.cardnum where (c < to_number(l.endpage) or c is null) and l.cardnum not like '________-_' ";
+                String querySql = " select nvl(c,0), l.areacode, l.endpage " +
+                        " from (select count(*) c, t.areacode from cred_dishonesty_pagelog t" +
+                        " group by areacode) r right join cred_dishonesty_log l " +
+                        "on r.areacode = l.areacode where (c < to_number(l.endpage) or c is null) and l.cardnum = '________-_' ";
                 if (hostName == null) {
                     querySql += " and l.hostname is null ";
                 } else if (!"".equals(hostName)) {
@@ -64,7 +64,7 @@ public class Main implements Runnable {
                 querySql += " order by nvl(c,0) desc";
                 List list;
                 if (sqlPageNum > 0) {
-                    list = service.getExeListForPage(querySql, sqlPageNum, 1);
+                    list = service.getExeListForPage(querySql, sqlPageNum, 5);
                 } else {
                     list = service.getExeList(querySql);
                 }
@@ -72,27 +72,25 @@ public class Main implements Runnable {
                 Iterator it = list.iterator();
                 while (it.hasNext()) {
                     Map map = (Map) it.next();
-                    String cardNum = (String) map.get("CARDNUM");
                     String areacode = (String) map.get("AREACODE");
                     int endpage = Integer.valueOf((String) map.get("ENDPAGE"));
                     int startpage = 1;
                     for (int i = startpage; i <= endpage; i++) {
                         String pageNum = i + "";
-                        String sql = "select * from cred_dishonesty_pagelog where cardnum ='" + cardNum + "' and pagenum = '" + pageNum + "'";
+                        String sql = "select * from cred_dishonesty_pagelog where cardnum ='________-_' and areacode = '" + areacode + "' and pagenum = '" + pageNum + "'";
                         List pagelist = service.getExeList(sql);
                         if (pagelist != null && pagelist.size() > 0) {
                             continue;
                         }
-                        PageHandler pageHandler = new PageHandler(1,pageNum, "__________"+cardNum+"____",areacode, httpUtilPool, hostName, 0, 0, service);
+                        PageHandler pageHandler = new PageHandler(2,pageNum, "________-_", areacode, httpUtilPool, hostName, 0, 0, service);
                         threadPool.execute(pageHandler);
-                        if (queue.size() > 100) {
+                        if (queue.size() > 80) {
                             Thread.currentThread().sleep(1000 * 60 * 1);
-                            logger.info("开始执行：queueSize" + queue.size()+",cardNum:"+cardNum+",pageNum"+pageNum);
+                            logger.info("开始执行：queueSize" + queue.size() + ",areacode:" + areacode + ",pageNum" + pageNum);
                         }
                     }
                 }
                 threadPool.shutdown();
-
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (HttpException e) {
@@ -101,14 +99,15 @@ public class Main implements Runnable {
                 e.printStackTrace();
             }
         } else {
-            logger.info("22点-24点 为网站数据更新时间，线程休眠2小时begin...");
+            logger.info("22:30-24:30点 为网站数据更新时间，线程休眠2小时begin...");
             try {
                 Thread.sleep(1000 * 60 * 60 * 2);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
-            logger.info("22点-24点 为网站数据更新时间，线程休眠2小时end...");
+            logger.info("22:30-24:30点 为网站数据更新时间，线程休眠2小时end...");
         }
 
     }
+
 }

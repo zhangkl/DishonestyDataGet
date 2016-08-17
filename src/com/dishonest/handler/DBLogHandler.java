@@ -1,7 +1,6 @@
 package com.dishonest.handler;
 
 import com.dishonest.util.HttpUtil;
-import org.apache.http.HttpException;
 import org.apache.log4j.Logger;
 import org.htmlparser.util.ParserException;
 
@@ -17,16 +16,14 @@ public class DBLogHandler implements Runnable {
 
     Logger logger = Logger.getLogger(DBLogHandler.class);
 
-
     String cardNum;
-    String pageNum;
-    String hostName;
     HttpUtil httpUtil;
+    String areacode;
 
-    public DBLogHandler(String pageNum, String cardNum, HttpUtil httpUtil, String hostName) throws HttpException {
-        this.pageNum = pageNum;
+
+    public DBLogHandler(String cardNum, String areacode, HttpUtil httpUtil) {
         this.cardNum = cardNum;
-        this.hostName = hostName;
+        this.areacode = areacode;
         this.httpUtil = httpUtil;
     }
 
@@ -34,10 +31,17 @@ public class DBLogHandler implements Runnable {
     public void run() {
         DishonestyService dishonestyService = new DishonestyService();
         try {
-            String s = dishonestyService.getPageHtml(httpUtil,cardNum,"0");
-            int maxPageNum = dishonestyService.saveLastMaxPageNum(s, cardNum);
-            String account = dishonestyService.saveLastCount(s, cardNum);
-            logger.info("cardnum:"+cardNum+",获取最大页面:"+maxPageNum+",最大条数:"+account);
+            String s = dishonestyService.getPageHtml(httpUtil, cardNum, "1", areacode);
+            if (cardNum.contains("-")) {
+                int maxPageNum = dishonestyService.saveLastMaxPageNum(s, cardNum, areacode);
+                String account = dishonestyService.saveLastCount(s, cardNum, areacode);
+                logger.info("cardnum:" + cardNum + "，地址代码：" + areacode + ",获取最大页面:" + maxPageNum + ",最大条数:" + account);
+            } else {
+                int maxPageNum = dishonestyService.saveLastMaxPageNum(s, cardNum.replaceAll("_", ""), areacode);
+                String account = dishonestyService.saveLastCount(s, cardNum.replaceAll("_", ""), areacode);
+                logger.info("cardnum:" + cardNum + "，地址代码：" + areacode + ",获取最大页面:" + maxPageNum + ",最大条数:" + account);
+            }
+
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (IOException e) {

@@ -31,25 +31,6 @@ public class HelpBatch implements Runnable {
     }
 
     public void getHttpPoolStatus() throws InterruptedException, SQLException {
-        String sql = "select ac 已存总条数," +
-                "       l 不合格页数," +
-                "       sc 重复页数," +
-                "       pc 剩余可用代理数," +
-                "       c 已查询页数," +
-                "       s 总页数," +
-                "       c / s * 100 || '%' 已完成比例," +
-                "       sysdate" +
-                "  from (select count(*) c from cred_dishonesty_pagelog)," +
-                "       (select sum(endpage) s from cred_dishonesty_log)," +
-                "       (select count(*) l" +
-                "          from cred_dishonesty_pagelog t,cred_dishonesty_log r" +
-                "         where t.samenum + t.sucessnum < 10 and r.cardnum = t.cardnum and r.endpage != t.pagenum)," +
-                "       (select count(*) ac from CRED_DISHONESTY_PERSON t)," +
-                "       (select count(*) pc from cred_dishonesty_proxy where isusered != 2)," +
-                "       (select sum(count(*)) sc from cred_dishonesty_pagelog t group by t.cardnum,t.pagenum having count(*)>1)";
-        Map map = ConnUtil.getInstance().executeQueryForMap(sql);
-        logger.info("当前运行状态:queue.size()=" + map);
-
         Calendar calender = Calendar.getInstance();
         if (calender.get(Calendar.HOUR_OF_DAY) != 11) {
             Main.timeFlag = true;
@@ -66,15 +47,16 @@ public class HelpBatch implements Runnable {
     public void run() {
         try {
             Calendar calender = Calendar.getInstance();
-            if (calender.get(Calendar.HOUR_OF_DAY) == 22 || calender.get(Calendar.HOUR_OF_DAY) == 23) {
+            if ((calender.get(Calendar.HOUR_OF_DAY) == 22 && (calender.get(Calendar.MINUTE) == 30)) || (calender.get(Calendar.HOUR_OF_DAY) == 23)) {
                 Main.timeFlag = false;
             } else {
                 Main.timeFlag = true;
             }
+            logger.info("运行helpBatch......" + Main.timeFlag);
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return ;
+        return;
     }
 
 

@@ -89,6 +89,7 @@ public class DishonestyService {
         int length = "<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页".length();
         int end = cons.indexOf("条\n" +
                 "\t\t</div>");
+        System.out.println(cons.substring(start + length, end));
         int page = Integer.parseInt(cons.substring(start + length, end).split("/")[1].split(" ")[0]);
         return page;
     }
@@ -198,26 +199,29 @@ public class DishonestyService {
     /**
      * 访问错误，重复发起，增加最大访问次数控制
      */
-    public List getPageList(HttpUtil httpUtil, String cardNum, String pageNum) throws ParserException, IOException, InterruptedException, SQLException {
-        String s = getPageHtml(httpUtil, cardNum, pageNum);
+    public List getPageList(HttpUtil httpUtil, String cardNum, String pageNum, String areacode) throws ParserException, IOException, InterruptedException, SQLException {
+        String s = getPageHtml(httpUtil, cardNum, pageNum, areacode);
         List arrayList = getIDList(s);
+        while (arrayList.size() == 0 && sendTime <= maxTime) {
+            sendTime++;
+            logger.info("获取页面信息错误,idlist:" + arrayList + ",发送次数：" + sendTime);
+            arrayList = getPageList(httpUtil, cardNum, pageNum, areacode);
+        }
         if (arrayList.size() == 0) {
-            logger.error("获取页面信息错误,idlist:" + arrayList + ",网页内容：" + s, new GetDateException("获取页面信息错误，获取id列表为空"));
-            getPageList(httpUtil, cardNum, pageNum);
+            logger.error("获取页面信息错误,idlist:" + arrayList, new GetDateException("获取页面信息错误，获取id列表为空"));
         }
         return arrayList;
     }
 
-    public String getPageHtml(HttpUtil httpUtil, String cardNum, String pageNum) throws InterruptedException, SQLException, IOException, ParserException {
+    public String getPageHtml(HttpUtil httpUtil, String cardNum, String pageNum, String areaCode) throws InterruptedException, SQLException, IOException, ParserException {
         sendTime = 0;
         String code = httpUtil.getCode();
         if (code == null || "".equals(code)) {
             code = getImageCode(httpUtil);
         }
-        String s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
+        String s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", cardNum, "pProvince", areaCode, "currentPage", pageNum, "pCode", code);
         while (sendTime < maxTime && (s == null || s.contains("验证码错误"))) {
             logger.info("验证码错误,发送次数：" + sendTime + ",cardNum:" + cardNum + ",pageNum:" + pageNum + ",code:" + code + ",代理：" + httpUtil.getProxyURL());
-            Thread.sleep(1000*60*2);
             httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=", null);
             code = getImageCode(httpUtil);
             s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "currentPage", pageNum, "pCode", code);
@@ -226,7 +230,8 @@ public class DishonestyService {
         if (s.contains("验证码错误")) {
             //changeProxy(httpUtil);
             logger.info("获取验证码错误，回调本方法！");
-            s = this.getPageHtml(httpUtil, cardNum, pageNum);
+            httpUtil = this.changeProxy(httpUtil);
+            s = this.getPageHtml(httpUtil, cardNum, pageNum, areaCode);
         }
         return s;
     }
@@ -234,7 +239,7 @@ public class DishonestyService {
     /**
      * 获取并存储具体失信人信息
      */
-    public int saveDishoney(String saveid, HttpUtil httpUtil, String cardNum) throws InterruptedException, IOException, SQLException {
+    public int saveDishoney(String saveid, HttpUtil httpUtil, String cardNum, String areacode) throws InterruptedException, IOException, SQLException {
         sendTime = 0;
         String idInfo = "";
         Map map = new HashMap();
@@ -255,26 +260,25 @@ public class DishonestyService {
         }
         if (idInfo == null || !idInfo.startsWith("{")) {
             httpUtil = changeProxy(httpUtil);
-            return saveDishoney(saveid, httpUtil, cardNum);
+            return saveDishoney(saveid, httpUtil, cardNum, areacode);
         }
         JSONObject json = null;
         try {
             json = JSONObject.fromObject(idInfo);
         } catch (JSONException jsonex) {
-            return saveDishoney(saveid, httpUtil, cardNum);
+            return saveDishoney(saveid, httpUtil, cardNum, areacode);
         }
         if (json == null) {
             logger.error("json为空：" + idInfo);
             changeProxy(httpUtil);
-            return saveDishoney(saveid, httpUtil, cardNum);
+            return saveDishoney(saveid, httpUtil, cardNum, areacode);
         }
         Integer iid = json.optInt("id");
         String siname = json.optString("iname");
         String scardnum = json.optString("cardNum");
         String scasecode = json.optString("caseCode");
-        String sage = json.optString("age", "0");
-        Integer iage = Integer.valueOf(sage);
-        String ssexy = json.optString("sexy");
+
+
         String sareaname = json.optString("areaName");
         String scourtname = json.optString("courtName");
         String sduty = json.optString("duty");
@@ -294,8 +298,6 @@ public class DishonestyService {
         list.add(siname);
         list.add(scardnum.replace("****", cardNum));
         list.add(scasecode);
-        list.add(iage);
-        list.add(ssexy);
         list.add(sareaname);
         list.add(scourtname);
         list.add(dregdate);
@@ -309,13 +311,30 @@ public class DishonestyService {
         list.add(spartytypename);
         list.add(sgistid);
         list.add(sgistunit);
-        String sql = "insert into CRED_DISHONESTY_PERSON (IID, SINAME, SCARDNUM, SCASECODE, IAGE, SSEXY, SAREANAME, SCOURTNAME, DREGDATE," +
-                " SDUTY, SPERFORMANCE, SPERFORMEDPART, SUNPERFORMPART, SDISRUPTTYPENAME, DPUBLISHDATE, SPARTYTYPENAME, SGISTID, SGISTUNIT) " +
-                "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "";
+        if ("580".equals(spartytypename)) {
+            String ssexy = json.optString("sexy");
+            String sage = json.optString("age", "0");
+            Integer iage = Integer.valueOf(sage);
+            list.add(iage);
+            list.add(ssexy);
+            sql = "insert into CRED_DISHONESTY_PERSON (IID, SINAME, SCARDNUM, SCASECODE, SAREANAME, SCOURTNAME, DREGDATE, SDUTY, SPERFORMANCE, SPERFORMEDPART," +
+                    " SUNPERFORMPART, SDISRUPTTYPENAME, DPUBLISHDATE, SPARTYTYPENAME, SGISTID, SGISTUNIT, IAGE, SSEXY) " +
+                    "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        } else if ("581".equals(spartytypename)) {
+            String sbusinessEntity = json.optString("businessEntity");
+            list.add(sbusinessEntity);
+            sql = "insert into CRED_DISHONESTY_ENT (IID, SINAME, SCARDNUM, SCASECODE, SAREANAME, SCOURTNAME, DREGDATE, SDUTY, SPERFORMANCE, SPERFORMEDPART," +
+                    " SUNPERFORMPART, SDISRUPTTYPENAME, DPUBLISHDATE, SPARTYTYPENAME, SGISTID, SGISTUNIT,SBUSINESSENTITY ) " +
+                    "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        }
+
         try {
             connUtil.psAdd(sql, list);
         } catch (SQLException sqlEx) {
-            String queryIdSql = "select * from CRED_DISHONESTY_PERSON where iid = '" + saveid + "'";
+            String queryIdSql = "select iid from CRED_DISHONESTY_PERSON p  where p.iid = '" + saveid + "'" +
+                    "union  all " +
+                    "select iid from CRED_DISHONESTY_ENT t  where t.iid = '" + saveid + "'";
             List resultlist = ConnUtil.getInstance().executeQueryForList(queryIdSql);
             if (resultlist != null && resultlist.size() > 0) {
                 return 0;
@@ -369,9 +388,9 @@ public class DishonestyService {
      * @throws SQLException
      * @throws IOException
      */
-    public String saveLastCount(String s, String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
+    public String saveLastCount(String s, String cardNum, String areacode) throws InterruptedException, SQLException, IOException, ParserException {
         String account = getPageAccount(s);
-        String sql = "update cred_dishonesty_log set allcount = '" + account + "',dcurrentdate = sysdate where cardnum = '" + cardNum + "'";
+        String sql = "update cred_dishonesty_log set allcount = '" + account + "',dcurrentdate = sysdate where cardnum = '" + cardNum + "' and areacode = '" + areacode + "'";
         connUtil.executeSaveOrUpdate(sql);
         return account;
     }
@@ -384,9 +403,9 @@ public class DishonestyService {
      * @throws SQLException
      * @throws IOException
      */
-    public int saveLastMaxPageNum(String s, String cardNum) throws InterruptedException, SQLException, IOException, ParserException {
+    public int saveLastMaxPageNum(String s, String cardNum, String areacode) throws InterruptedException, SQLException, IOException, ParserException {
         int maxPageNum = getMaxPage(s);
-        String sql = "update cred_dishonesty_log set endpage = '" + maxPageNum + "' where cardnum = '" + cardNum + "'";
+        String sql = "update cred_dishonesty_log set endpage = '" + maxPageNum + "' where cardnum = '" + cardNum + "' and areacode = '" + areacode + "'";
         connUtil.executeSaveOrUpdate(sql);
         return maxPageNum;
     }

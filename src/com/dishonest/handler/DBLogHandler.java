@@ -1,6 +1,8 @@
 package com.dishonest.handler;
 
+import com.dishonest.util.GetDateException;
 import com.dishonest.util.HttpUtil;
+import com.dishonest.util.NetWorkException;
 import org.apache.log4j.Logger;
 import org.htmlparser.util.ParserException;
 
@@ -19,29 +21,28 @@ public class DBLogHandler implements Runnable {
     String cardNum;
     HttpUtil httpUtil;
     String areacode;
+    String name;
+    String pagenum;
+    int dataType;
 
 
-    public DBLogHandler(String cardNum, String areacode, HttpUtil httpUtil) {
+    public DBLogHandler(String name, String cardNum, String areacode, String pagenum, HttpUtil httpUtil, int dataType) {
+        this.name = name;
         this.cardNum = cardNum;
         this.areacode = areacode;
+        this.pagenum = pagenum;
         this.httpUtil = httpUtil;
+        this.dataType = dataType;
     }
 
     @Override
     public void run() {
         DishonestyService dishonestyService = new DishonestyService();
         try {
-            String s = dishonestyService.getPageHtml(httpUtil, cardNum, "1", areacode);
-            if (cardNum.contains("-")) {
-                int maxPageNum = dishonestyService.saveLastMaxPageNum(s, cardNum, areacode);
-                String account = dishonestyService.saveLastCount(s, cardNum, areacode);
-                logger.info("cardnum:" + cardNum + "，地址代码：" + areacode + ",获取最大页面:" + maxPageNum + ",最大条数:" + account);
-            } else {
-                int maxPageNum = dishonestyService.saveLastMaxPageNum(s, cardNum.replaceAll("_", ""), areacode);
-                String account = dishonestyService.saveLastCount(s, cardNum.replaceAll("_", ""), areacode);
-                logger.info("cardnum:" + cardNum + "，地址代码：" + areacode + ",获取最大页面:" + maxPageNum + ",最大条数:" + account);
-            }
-
+            String s = dishonestyService.getPageHtml(name, cardNum, areacode, pagenum,httpUtil);
+            int maxPageNum = dishonestyService.saveLastMaxPageNum(s, cardNum, areacode);
+            String account = dishonestyService.saveLastCount(s, cardNum, areacode);
+            logger.info("cardnum:" + cardNum + "，地址代码：" + areacode + ",获取最大页面:" + maxPageNum + ",最大条数:" + account);
         } catch (InterruptedException e) {
             e.printStackTrace();
         } catch (IOException e) {
@@ -49,6 +50,10 @@ public class DBLogHandler implements Runnable {
         } catch (SQLException e) {
             e.printStackTrace();
         } catch (ParserException e) {
+            e.printStackTrace();
+        } catch (NetWorkException e) {
+            e.printStackTrace();
+        } catch (GetDateException e) {
             e.printStackTrace();
         }
     }

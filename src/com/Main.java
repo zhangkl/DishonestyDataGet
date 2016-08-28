@@ -22,14 +22,19 @@ public class Main implements Runnable {
     String hostName;
     HttpUtilPool httpUtilPool;
     int sqlPageNum;
+    int dataType;              //1为个人 2为企业
     public static boolean timeFlag = true;
 
-    public Main(int threadPoolSize, String hostName, HttpUtilPool httpUtilPool, int sqlPageNum) {
+
+
+    public Main(int threadPoolSize, String hostName, HttpUtilPool httpUtilPool, int sqlPageNum,int dataType) {
         this.threadPoolSize = threadPoolSize;
         this.hostName = hostName;
         this.httpUtilPool = httpUtilPool;
         this.sqlPageNum = sqlPageNum;
+        this.dataType = dataType;
     }
+
 
     public static void main(String[] args) throws SQLException, InterruptedException, HttpException, GetDateException, ExecutionException {
         ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
@@ -38,8 +43,8 @@ public class Main implements Runnable {
         int pageNum = 0;
         for (int i = 0; i < 6; i++) {
             pageNum++;
-            HttpUtilPool httpUtilPool = new HttpUtilPool(5, "127.0.0.1:108" + i);
-            Main main = new Main(5, System.getenv("COMPUTERNAME"), httpUtilPool, pageNum);
+            HttpUtilPool httpUtilPool = new HttpUtilPool(5);
+            Main main = new Main(5, System.getenv("COMPUTERNAME"), httpUtilPool, pageNum,1);
             Thread thread = new Thread(main);
             thread.start();
         }
@@ -83,7 +88,13 @@ public class Main implements Runnable {
                         if (pagelist != null && pagelist.size() > 0) {
                             continue;
                         }
-                        PageHandler pageHandler = new PageHandler(1,pageNum, "__________"+cardNum+"____",areacode, httpUtilPool, hostName, 0, 0, service);
+                        String name ;
+                        if(dataType == 1){
+                            name = "__";
+                        } else{
+                            name = "____";
+                        }
+                        PageHandler pageHandler = new PageHandler(name, cardNum,areacode,pageNum,hostName, httpUtilPool, service,dataType);
                         threadPool.execute(pageHandler);
                         if (queue.size() > 100) {
                             Thread.currentThread().sleep(1000 * 60 * 1);
@@ -94,8 +105,6 @@ public class Main implements Runnable {
                 threadPool.shutdown();
 
             } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (HttpException e) {
                 e.printStackTrace();
             } catch (SQLException e) {
                 e.printStackTrace();

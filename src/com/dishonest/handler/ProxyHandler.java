@@ -9,9 +9,7 @@
 package com.dishonest.handler;
 
 import com.dishonest.dao.ConnUtil;
-import com.dishonest.util.CheckNumber;
 import com.dishonest.util.HttpUtil;
-import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -24,17 +22,16 @@ import org.htmlparser.Parser;
 import org.htmlparser.filters.AndFilter;
 import org.htmlparser.filters.HasAttributeFilter;
 import org.htmlparser.filters.TagNameFilter;
-import org.htmlparser.tags.LinkTag;
 import org.htmlparser.util.NodeList;
 import org.htmlparser.util.ParserException;
 
-import javax.imageio.ImageIO;
-import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.LineNumberReader;
 import java.sql.SQLException;
-import java.util.*;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -163,107 +160,5 @@ public class ProxyHandler implements Runnable {
             System.out.println(line);
         }
     }
-
-    public void compare() {
-        String[] strings = new String[]{"0:1238 共12372", "660:14 共135", "661:7 共66", "662:16 共151", "663:9 共87", "664:18 共174", "665:16 共151", "666:13 共123", "667:41 共401", "668:16 共160", "669:166 共1659", "670:227 共2269", "671:44 共440", "672:147 共1467", "673:43 共423", "674:140 共1392", "675:82 共813", "676:31 共301", "677:30 共294", "678:56 共556", "679:28 共274", "680:2 共17", "681:25 共241", "682:21 共203", "683:18 共171", "684:12 共113", "685:1 共0", "686:9 共83", "687:5 共45", "688:2 共12", "689:7 共65", "690:9 共86", "691:1 共0", "692:1 共0", "693:1 共0"};
-        int sum = 0;
-        for (int i = 1; i < strings.length; i++) {
-            int temp = Integer.valueOf(strings[i].split("共")[1]);
-            sum += temp;
-        }
-        System.out.println(sum);
-    }
-
-    public void getSame() throws InterruptedException, IOException {
-        HttpUtil httpUtil = new HttpUtil();
-        Map map = new HashMap();
-        for (int i = 1; i <= 10; i++) {
-            byte[] result = httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=" + System.currentTimeMillis(), null);
-            ByteInputStream bin = new ByteInputStream();
-            bin.setBuf(result);
-            BufferedImage image = ImageIO.read(bin);
-            String code = CheckNumber.getCheckNumber(image);
-            String s = httpUtil.doPostString("http://shixin.court.gov.cn/findd",
-                    "pName", "__", "pCardNum", "__________1110____", "pProvince", "672", "currentPage", i + "", "pCode", code);
-            if (s.contains("验证码错误")) {
-                i--;
-                continue;
-            }
-            map.put(i, getIDList(s));
-        }
-        for (int j = 1; j < map.size(); j++) {
-            System.out.println("页数：" + j + ":" + map.get(j));
-
-        }
-    }
-
-    public List<String> getIDList(String cons) {
-        ArrayList list = new ArrayList();
-        if (cons == null || "".equals(cons) || cons.contains("验证码错误")) {
-            return null;
-        }
-        try {
-            Parser e = new Parser();
-            e.setInputHTML(cons);
-            e.setEncoding("utf-8");
-            NodeFilter filter1 = new HasAttributeFilter("class", "View");
-            NodeFilter filter2 = new TagNameFilter("a");
-            AndFilter contentFilter = new AndFilter(filter1, filter2);
-            NodeList nodes2 = e.extractAllNodesThatMatch(contentFilter);
-            for (int i = 0; i < nodes2.size(); ++i) {
-                LinkTag linkTag = (LinkTag) nodes2.elementAt(i);
-                list.add(linkTag.getAttribute("id"));
-            }
-        } catch (Exception var9) {
-            var9.printStackTrace();
-        }
-        return list;
-    }
-
-    public void getAccount() throws InterruptedException, IOException, SQLException {
-        HttpUtil httpUtil = new HttpUtil();
-        ConnUtil connUtil = ConnUtil.getInstance();
-        List list = connUtil.executeQueryForList("select * from cred_dishonesty_log");
-        Iterator it = list.iterator();
-        while (it.hasNext()) {
-            Map map = (Map) it.next();
-            String cardNum = (String) map.get("CARDNUM");
-            String s;
-            do {
-                byte[] result = httpUtil.doGetByte("http://shixin.court.gov.cn/image.jsp?date=" + System.currentTimeMillis(), null);
-                ByteInputStream bin = new ByteInputStream();
-                bin.setBuf(result);
-                BufferedImage image = ImageIO.read(bin);
-                String code = CheckNumber.getCheckNumber(image);
-                s = httpUtil.doPostString("http://shixin.court.gov.cn/findd",
-                        "pName", "__", "pCardNum", "__________" + cardNum + "____", "pProvince", "0", "pCode", code);
-            } while (s.contains("验证码错误"));
-            System.out.println(cardNum + ":" + getPageAccount(s));
-        }
-    }
-
-    public String getPageAccount(String cons) {
-        int start = cons.indexOf("<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页");
-        int length = "<input onclick=\"jumpTo()\" value=\"到\" type=\"button\" /> <input id=\"pagenum\" name=\"pagenum\" maxlength=\"6\" value=\"\" size=\"4\" type=\"text\" /> 页".length();
-        int end = cons.indexOf("条\n" +
-                "\t\t</div>");
-        String page = null;
-        try {
-            page = cons.substring(start + length, end).split("/")[1];
-        } catch (Exception e) {
-            System.out.println(cons);
-            e.printStackTrace();
-        }
-        return page;
-    }
-
-    public void testRec() {
-        System.out.println(111);
-        while (true) {
-            testRec();
-            System.out.println(222);
-        }
-    }
-
 
 }

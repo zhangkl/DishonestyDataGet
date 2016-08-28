@@ -14,9 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.*;
 
-public class Main_ForENT implements Runnable {
+public class MainForENT implements Runnable {
 
-    Logger logger = Logger.getLogger(Main_ForENT.class);
+    Logger logger = Logger.getLogger(MainForENT.class);
 
     int threadPoolSize;
     String hostName;
@@ -24,7 +24,7 @@ public class Main_ForENT implements Runnable {
     int sqlPageNum;
     public static boolean timeFlag = true;
 
-    public Main_ForENT(int threadPoolSize, String hostName, HttpUtilPool httpUtilPool, int sqlPageNum) {
+    public MainForENT(int threadPoolSize, String hostName, HttpUtilPool httpUtilPool, int sqlPageNum) {
         this.threadPoolSize = threadPoolSize;
         this.hostName = hostName;
         this.httpUtilPool = httpUtilPool;
@@ -35,14 +35,10 @@ public class Main_ForENT implements Runnable {
         ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
         HelpBatch helpBatch = new HelpBatch();
         ses.scheduleAtFixedRate(helpBatch, 0, 60, TimeUnit.SECONDS);
-        int pageNum = 0;
-        for (int i = 0; i < 1; i++) {
-            pageNum++;
-            HttpUtilPool httpUtilPool = new HttpUtilPool(3);
-            Main_ForENT main = new Main_ForENT(3, "zhangkl", httpUtilPool, pageNum);
-            Thread thread = new Thread(main);
-            thread.start();
-        }
+        HttpUtilPool httpUtilPool = new HttpUtilPool(8);
+        MainForENT main = new MainForENT(8, "zhangkl", httpUtilPool, 0);
+        Thread thread = new Thread(main);
+        thread.start();
     }
 
     public void run() {
@@ -50,8 +46,7 @@ public class Main_ForENT implements Runnable {
             try {
                 BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(100);
                 ExecutorService threadPool = new ThreadPoolExecutor(threadPoolSize, threadPoolSize, 0L, TimeUnit.MILLISECONDS, queue);
-
-                DishonestyService service = new DishonestyService();
+                DishonestyService service = new DishonestyService(httpUtilPool);
                 String querySql = " select nvl(c,0), l.areacode, l.endpage " +
                         " from (select count(*) c, t.areacode from cred_dishonesty_pagelog t" +
                         " group by areacode) r right join cred_dishonesty_log l " +
@@ -64,7 +59,7 @@ public class Main_ForENT implements Runnable {
                 querySql += " order by nvl(c,0) desc";
                 List list;
                 if (sqlPageNum > 0) {
-                    list = service.getExeListForPage(querySql, sqlPageNum, 5);
+                    list = service.getExeListForPage(querySql, sqlPageNum, 3);
                 } else {
                     list = service.getExeList(querySql);
                 }
@@ -74,26 +69,23 @@ public class Main_ForENT implements Runnable {
                     Map map = (Map) it.next();
                     String areacode = (String) map.get("AREACODE");
                     int endpage = Integer.valueOf((String) map.get("ENDPAGE"));
-                    int startpage = 1;
-                    for (int i = startpage; i <= endpage; i++) {
+                    for (int i = endpage; i > 0; i--) {
                         String pageNum = i + "";
                         String sql = "select * from cred_dishonesty_pagelog where cardnum ='________-_' and areacode = '" + areacode + "' and pagenum = '" + pageNum + "'";
                         List pagelist = service.getExeList(sql);
                         if (pagelist != null && pagelist.size() > 0) {
                             continue;
                         }
-                        PageHandler pageHandler = new PageHandler(2,pageNum, "________-_", areacode, httpUtilPool, hostName, 0, 0, service);
+                        PageHandler pageHandler = new PageHandler("____", "", areacode, pageNum, hostName, httpUtilPool, service, 2);
                         threadPool.execute(pageHandler);
-                        if (queue.size() > 80) {
-                            Thread.currentThread().sleep(1000 * 60 * 1);
+                        if (queue.size() > 20) {
+                            Thread.currentThread().sleep(1000 * 30 * 1);
                             logger.info("开始执行：queueSize" + queue.size() + ",areacode:" + areacode + ",pageNum" + pageNum);
                         }
                     }
                 }
                 threadPool.shutdown();
             } catch (InterruptedException e) {
-                e.printStackTrace();
-            } catch (HttpException e) {
                 e.printStackTrace();
             } catch (SQLException e) {
                 e.printStackTrace();

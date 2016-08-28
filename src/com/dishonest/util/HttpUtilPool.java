@@ -20,27 +20,32 @@ import java.util.Hashtable;
 
 public class HttpUtilPool {
 
-    Logger logger = Logger.getLogger(HttpUtilPool.class);
+    static Logger logger = Logger.getLogger(HttpUtilPool.class);
     private Hashtable connections = new Hashtable();
     private int sendTime = 0;
     private int maxSendTime = 5;
-    private long waitTime = 5000;
+    private static long waitTime = 5000;
 
-    public HttpUtilPool(int myProxyNum, int initial) throws SQLException, InterruptedException {
-        DishonestyService ds = new DishonestyService();
-        for (int i = 0; i < initial; i++) {
-             HttpUtil httpUtil = new HttpUtil(true,ds.getProxy(0));
-            connections.put(httpUtil,false);
-        }
-    }
-
+    /**
+     * 直接请求不用代理
+     * @param proxyNum
+     * @throws SQLException
+     * @throws InterruptedException
+     */
     public HttpUtilPool(int proxyNum) throws SQLException, InterruptedException {
         for (int i = 0; i < proxyNum; i++) {
             HttpUtil httpUtil = new HttpUtil();
-            connections.put(httpUtil,false);
+            connections.put(httpUtil,Boolean.FALSE);
         }
     }
 
+    /**
+     * 有可用稳定代理用
+     * @param proxyNum
+     * @param proxyUrl
+     * @throws SQLException
+     * @throws InterruptedException
+     */
     public HttpUtilPool(int proxyNum,String proxyUrl) throws SQLException, InterruptedException {
         DishonestyService ds = new DishonestyService();
         for (int i = 0; i < proxyNum; i++) {
@@ -52,7 +57,8 @@ public class HttpUtilPool {
     public HttpUtil getHttpUtil() throws GetDateException {
         HttpUtil httpUtil = null;
         Enumeration cons = connections.keys();
-        sendTime = 0;
+        int sendTime = 0;
+        int maxSendTime = 5;
         do {
             synchronized (connections) {
                 while (cons.hasMoreElements()) {
@@ -65,6 +71,7 @@ public class HttpUtilPool {
                     }
                 }
                 try {
+                    logger.error("HttpUtilPool已满,等待" + waitTime + ",重复发送次数：" + sendTime );
                     connections.wait(waitTime);
                     sendTime++;
                 } catch (InterruptedException e) {
@@ -72,7 +79,9 @@ public class HttpUtilPool {
                 }
             }
         } while (sendTime < maxSendTime && httpUtil == null);
+        logger.error("HttpUtilPool已满,等待无效，重新创建");
         httpUtil = new HttpUtil();
+        connections.put(httpUtil,false);
         return httpUtil;
         /*throw new GetDateException("HttpUtilPool已满,等待" + waitTime + ",重复发送次数：" + sendTime + ",仍无可用httpUtil。");*/
 

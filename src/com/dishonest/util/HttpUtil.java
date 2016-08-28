@@ -23,6 +23,7 @@ import org.apache.http.util.EntityUtils;
 import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 
 /**
@@ -47,7 +48,24 @@ public class HttpUtil {
 
     private String code;
 
+    public HashMap<String, String> getMapCookies() {
+        return mapCookies;
+    }
+
+    public void setMapCookies(HashMap<String, String> mapCookies) {
+        this.mapCookies = mapCookies;
+    }
+
+    public String getCookies() {
+        return cookies;
+    }
+
+    public void setCookies(String cookies) {
+        this.cookies = cookies;
+    }
+
     public String getCode() {
+
         return code;
     }
 
@@ -79,69 +97,86 @@ public class HttpUtil {
         this.proxyPort = Integer.parseInt(proxyURL.split(":")[1]);
     }
 
-    public HttpUtil clone() {
+    /*public HttpUtil clone() {
         HttpUtil instance = new HttpUtil();
         instance.mapCookies = this.mapCookies;
         instance.cookies = this.cookies;
+        instance.code = this.code;
         return instance;
     }
 
     public void clone(HttpUtil instance) {
         this.mapCookies = instance.mapCookies;
         this.cookies = instance.cookies;
-    }
+    }*/
 
-    public String doGetString(String url, Map params) throws InterruptedException {
-        Object object;
-        object = doGet(url, params);
+    public String doGetString(String url, Map params) throws InterruptedException, IOException, NetWorkException {
+        Object object = null;
         sendTimes = 0;
-        while (sendTimes < maxTimes && object == null) {
-            logger.info("url:" + url + " :发送错误，重新发起。");
-            Thread.sleep(1000 * 5);
+        try {
             object = doGet(url, params);
-            sendTimes++;
+        } catch (NetWorkException e) {
+            while (sendTimes < maxTimes && object == null) {
+                Thread.sleep(1000 * 5);
+                object = doGet(url, params);
+                sendTimes++;
+                if (object != null) {
+                    return object.toString();
+                }
+            }
+            throw e;
         }
         return object.toString();
     }
 
-    public byte[] doGetByte(String url, Map params) throws InterruptedException, ClassCastException {
-        Object object = doGet(url, params);
+    public byte[] doGetByte(String url, Map params) throws InterruptedException, ClassCastException, IOException, NetWorkException {
         sendTimes = 0;
-        while (sendTimes<maxTimes && (object == null || object instanceof String || ((byte[]) object).length == 0)) {
-            logger.info("url:" + url + " :发送错误，休眠5s，重新发起。sendTimes:"+sendTimes);
+        Object object = null;
+        try {
             object = doGet(url, params);
-            sendTimes++;
-        }
-        if ((object == null || object instanceof String)) {
-            return null;
-        } else {
+            while (sendTimes < maxTimes && (object == null || object instanceof String || ((byte[]) object).length == 0)) {
+                object = doGet(url, params);
+                sendTimes++;
+            }
             return (byte[]) object;
+        } catch (NetWorkException e) {
+            logger.error(object, e);
+            throw e;
+        } catch (ClassCastException e) {
+            logger.error(object + ":" + sendTimes, e);
+            throw e;
         }
     }
 
-    public String doPostString(String url, final Object... paramlist) throws InterruptedException {
+    public String doPostString(String url, final Object... paramlist) throws InterruptedException, IOException, NetWorkException {
         Map<String, Object> map = new HashMap<String, Object>();
         for (int i = 0; i < paramlist.length / 2; i++) {
             map.put(paramlist[i * 2].toString(), paramlist[i * 2 + 1]);
         }
-        Object object = doPost(url, map);
         sendTimes = 0;
-        while (sendTimes <= maxTimes && object == null) {
-            logger.info("url:" + url + " :发送错误，休眠5秒，重新发起。");
-            Thread.sleep(1000 * 5);
-            object = doPost(url, map);
-            sendTimes++;
+        try {
+            Object object = doPost(url, map);
+            while (sendTimes <= maxTimes && object == null) {
+                Thread.sleep(1000 * 5);
+                object = doPost(url, map);
+                sendTimes++;
+                if (object != null) {
+                    return object.toString();
+                }
+            }
+            return object.toString();
+        } catch (NetWorkException e) {
+            throw e;
         }
-        return object.toString();
     }
 
-    public Object doGet(String url, Map params) throws InterruptedException {
+    public Object doGet(String url, Map params) throws InterruptedException, IOException, NetWorkException {
         /* 建立HTTPGet对象 */
         String paramStr = "";
         if (params != null) {
-            Iterator iter = params.entrySet().iterator();
-            while (iter.hasNext()) {
-                Map.Entry entry = (Map.Entry) iter.next();
+            Iterator item = params.entrySet().iterator();
+            while (item.hasNext()) {
+                Map.Entry entry = (Map.Entry) item.next();
                 Object key = entry.getKey();
                 Object val = entry.getValue();
                 paramStr += paramStr = "&" + key + "=" + val;
@@ -164,9 +199,9 @@ public class HttpUtil {
 
             RequestConfig config = RequestConfig.custom()
                     .setProxy(proxy)
-                    .setConnectTimeout(1000*60)
-                    .setConnectionRequestTimeout(1000*60)
-                    .setSocketTimeout(1000*60).build();
+                    .setConnectTimeout(1000 * 60)
+                    .setConnectionRequestTimeout(1000 * 60)
+                    .setSocketTimeout(1000 * 60).build();
             httpRequest.setConfig(config);
         }
 
@@ -174,7 +209,6 @@ public class HttpUtil {
         if (cookies != null) {
             httpRequest.setHeader("Cookie", cookies);
         }
-        String errorInfo = "验证码错误:";
         try {
             /* 发送请求并等待响应 */
             HttpResponse httpResponse = httpClient.execute(httpRequest);
@@ -184,7 +218,8 @@ public class HttpUtil {
                 /* 读返回数据 */
                 getCookies(httpResponse);
                 HttpEntity entity = httpResponse.getEntity();
-                Object result = null;
+                Object result;
+                logger.info(entity.getContentType().getValue());
                 if (entity.getContentType().getValue().startsWith("image")) {
                     result = EntityUtils.toByteArray(entity);
                 } else {
@@ -193,24 +228,27 @@ public class HttpUtil {
                 httpRequest.abort();
                 return result;
             } else {
-                errorInfo += "url:" + url + " ,doGet请求响应码：" + httpResponse.getStatusLine().getStatusCode();
-                logger.info(errorInfo);
+                throw new NetWorkException("url:" + url + " ,doGet请求响应码：" + httpResponse.getStatusLine().getStatusCode());
             }
         } catch (ClientProtocolException e) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + " ,调用doGet异常：" + e.getMessage();
+            logger.error(e.getMessage());
         } catch (IOException e) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + " ,调用doGet异常：" + e.getMessage();
+            logger.error(e.getMessage());
+        } catch (NetWorkException e) {
+            logger.error(e.getMessage());
+            throw e;
+        } finally {
+            httpRequest.abort();
         }
-        httpRequest.abort();
-        return errorInfo;
+        return null;
     }
 
-    private Object doPost(String url, Map map) throws InterruptedException {
+    private Object doPost(String url, Map map) throws InterruptedException, IOException, NetWorkException {
         /* 建立HTTPPost对象 */
         List<NameValuePair> params = new ArrayList<NameValuePair>();
         Iterator iter = map.keySet().iterator();
-        String key = "";
-        String value = null;
+        String key;
+        String value;
         while (iter.hasNext()) {
             key = (String) iter.next();
             value = (String) map.get(key);
@@ -235,7 +273,6 @@ public class HttpUtil {
         if (cookies != null) {
             httpRequest.setHeader("Cookie", cookies);
         }
-        String errorInfo = "验证码错误";
         try {
             /* 添加请求参数到请求对象 */
             httpRequest.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
@@ -250,22 +287,33 @@ public class HttpUtil {
                 httpRequest.abort();
                 return result;
             } else {
-                errorInfo += Thread.currentThread().getName() + ":" + url + " :" + params + ",doPost请求响应码：" + httpResponse.getStatusLine().getStatusCode();
+                throw new NetWorkException("url:" + url + " ,doPost请求响应码：" + httpResponse.getStatusLine().getStatusCode());
             }
-
-        } catch (Exception exception) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + " :" + params + ",调用doPost异常：" + exception.getMessage();
+        } catch (NetWorkException e) {
+            throw e;
+        } catch (UnsupportedEncodingException e) {
+            logger.error(e.getMessage());
+        } catch (ClientProtocolException e) {
+            logger.error(e.getMessage());
+        } catch (IOException e) {
+            logger.error(e.getMessage());
+        } finally {
+            httpRequest.abort();
         }
-        httpRequest.abort();
-        return errorInfo;
+        return null;
     }
 
     private void setHeader(HttpRequestBase http) {
-        http.setHeader("User-Agent", "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6");
+        http.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.106 Safari/537.36");
     }
 
     private void getCookies(HttpResponse response) {
         Header[] list = response.getHeaders("Set-Cookie");
+        if (list == null || list.length == 0) {
+            return;
+        } else {
+            //mapCookies.clear();
+        }
         for (Header header : list) {
             String value = header.getValue();
             String[] arrParams = value.split(";");
@@ -309,9 +357,8 @@ public class HttpUtil {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        do{
+        do {
             HttpUtil httpUtil = new HttpUtil();
-            System.out.println(((byte[])httpUtil.doGet("http://shixin.court.gov.cn/image.jsp",null)).length);
         } while (true);
     }
 

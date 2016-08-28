@@ -99,50 +99,9 @@ public class ConnUtil {
 
     //执行查询
     public Map executeQueryForMap(String sql) throws SQLException {
-        ResultSet rs = null;
-        Map rowData = new HashMap();
-        Statement statement = null;
-        try {
-            Connection connection = conPool.getConnection();
-            statement = connection.createStatement();
-            rs = statement.executeQuery(sql);
-            ResultSetMetaData md = rs.getMetaData(); //得到结果集(rs)的结构信息，比如字段数、字段名等
-            int columnCount = md.getColumnCount(); //返回此 ResultSet 对象中的列数
-            if (rs.next()) {
-                for (int i = 1; i <= columnCount; i++) {
-                    rowData.put(md.getColumnName(i), rs.getObject(i));
-                }
-            } else {
-                return null;
-            }
-            conPool.returnConnection(connection);
-        } catch (SQLException e) {
-            throw e;
-        } finally {
-            if (statement != null) {
-                statement.close();
-            }
-        }
+        List  list = this.executeQueryForList(sql);
+        Map rowData = (Map) list.get(0);
         return rowData;
-    }
-
-    //执行查询
-    public ResultSet executeQuery(String sql) throws SQLException {
-        ResultSet rs = null;
-        Statement statement = null;
-        try {
-            Connection connection = conPool.getConnection();
-            statement = connection.createStatement();
-            rs = statement.executeQuery(sql);
-            conPool.returnConnection(connection);
-        } catch (SQLException e) {
-            throw e;
-        } finally {
-            if (statement != null) {
-                statement.close();
-            }
-        }
-        return rs;
     }
 
     //执行查询

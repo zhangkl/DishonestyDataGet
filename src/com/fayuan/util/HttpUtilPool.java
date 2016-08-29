@@ -7,9 +7,9 @@
  * Vestibulum commodo. Ut rhoncus gravida arcu.
  ******************************************************************************/
 
-package com.dishonest.util;
+package com.fayuan.util;
 
-import com.dishonest.handler.DishonestyService;
+import com.fayuan.handler.DishonestyService;
 import org.apache.http.HttpException;
 import org.apache.log4j.Logger;
 

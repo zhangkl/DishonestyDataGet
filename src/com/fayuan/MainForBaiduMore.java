@@ -1,8 +1,8 @@
-package com;
+package com.fayuan;
 
-import com.dishonest.dao.ConnUtil;
-import com.dishonest.handler.DishonestyService;
-import com.dishonest.util.*;
+import com.fayuan.dao.ConnUtil;
+import com.fayuan.handler.DishonestyService;
+import com.fayuan.util.*;
 import org.apache.log4j.Logger;
 import org.htmlparser.util.ParserException;
 
@@ -108,11 +108,13 @@ public class MainForBaiduMore implements Runnable {
                                         int day_2_max = 9;
                                         if (day_1==0){
                                             day_2_min = 1;
+                                            day_2_max = 9;
                                         } else if (day_1 == 3) {
+                                            day_2_min = 0;
                                             day_2_max = 1;
                                         }
                                         //根据日期第一位轮询日期第二位的范围
-                                        for (int day_2 = day_2_min; day_2 < day_2_max; day_2++) {
+                                        for (int day_2 = day_2_min; day_2 <= day_2_max; day_2++) {
                                             tempCardnum = cardnum.replaceFirst("_", String.valueOf(day_2));
                                             html = ds.getPageHtml(name, tempCardnum, areacode, "1", httpUtil);
                                             resultlist = ds.getIDList(html);
@@ -120,14 +122,20 @@ public class MainForBaiduMore implements Runnable {
                                                 for (int j = 0; j < resultlist.size(); j++) {
                                                     cardnum = tempCardnum;
                                                     fayuan_id = (String) resultlist.get(j);
-                                                    ds.saveDishoney(fayuan_id, cardnum, areacode, httpUtil);
+                                                    ds.saveDishoney(fayuan_id, cardnum, httpUtil);
                                                 }
                                                 logStr = "法院数据中存在并且已插入resultlist:" + resultlist + ",cardnum:" + cardnum + ",时间:" + DateUtil.getNowDate();
                                                 break;
+                                            } else {
+                                                logStr = "无法确定日期第二位："+cardnum+",idlist:"+resultlist;
                                             }
                                         }
+                                    } else {
+                                        logStr = "无法确定日期第一位："+cardnum+",idlist:"+resultlist;
                                     }
                                 }
+                            } else {
+                                logStr = "无法确定月份第二位："+cardnum+",idlist:"+resultlist;
                             }
                         }
                     }

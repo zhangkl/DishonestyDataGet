@@ -6,7 +6,7 @@
  * Vestibulum commodo. Ut rhoncus gravida arcu.
  ******************************************************************************/
 
-package com.dishonest.util;
+package com.fayuan.util;
 
 import java.sql.Date;
 import java.sql.Timestamp;

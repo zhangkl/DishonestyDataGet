@@ -1,8 +1,8 @@
-package com;
+package com.fayuan;
 
-import com.dishonest.handler.DBLogHandler;
-import com.dishonest.handler.DishonestyService;
-import com.dishonest.util.HttpUtil;
+import com.fayuan.handler.DBLogHandler;
+import com.fayuan.handler.DishonestyService;
+import com.fayuan.util.HttpUtil;
 import org.apache.http.HttpException;
 
 import java.sql.SQLException;
@@ -24,20 +24,29 @@ public class MainForGetLog {
         }
     }
 
+    /**
+     * 企业根据areaCode为变量，将条数信息存储到log表中
+     * @throws SQLException
+     * @throws InterruptedException
+     * @throws HttpException
+     */
     public void workForENT() throws SQLException, InterruptedException, HttpException {
-        ExecutorService threadPool = Executors.newFixedThreadPool(8);
+        ExecutorService threadPool = Executors.newFixedThreadPool(5);
         String[] areaArray = {"660", "661", "662", "663", "664", "665", "666", "667", "668", "669", "670", "671", "672", "673", "674", "675", "676", "677", "678", "679", "680", "681", "682", "683", "684", "685", "686", "687", "688", "689", "690", "691", "692", "693"};
         for (int i = 0; i < areaArray.length; i++) {
-            DBLogHandler dlh = new DBLogHandler("____", "", areaArray[i], "0", new HttpUtil(), DataType);
+            DBLogHandler dlh = new DBLogHandler("____", "_________", areaArray[i], "0", new HttpUtil(), DataType);
             threadPool.execute(dlh);
         }
     }
 
+    /**
+     * 个人根据身份证号码日期四位为变量，将该条信息存储在log表中
+     * @throws SQLException
+     * @throws InterruptedException
+     * @throws HttpException
+     */
     public void workerForPerson() throws SQLException, InterruptedException, HttpException {
-        ExecutorService threadPool = Executors.newFixedThreadPool(8);
-        /*HttpUtilPool httpUtilPool = new HttpUtilPool(1, 7);*/
-        /*HelpBatch help = new HelpBatch(httpUtilPool,threadPool);
-        threadPool.execute(help);*/
+        ExecutorService threadPool = Executors.newFixedThreadPool(5);
         String querySql = "select * from cred_dishonesty_log where dcurrentdate < to_date('2016-08-13','yyyy-mm-dd')";
         DishonestyService service = new DishonestyService();
         List list = service.getExeList(querySql);

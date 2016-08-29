@@ -1,10 +1,10 @@
-package com.dishonest.handler;
+package com.fayuan.handler;
 
-import com.dishonest.dao.ConnUtil;
-import com.dishonest.util.GetDateException;
-import com.dishonest.util.HttpUtil;
-import com.dishonest.util.HttpUtilPool;
-import com.dishonest.util.NetWorkException;
+import com.fayuan.dao.ConnUtil;
+import com.fayuan.util.GetDateException;
+import com.fayuan.util.HttpUtil;
+import com.fayuan.util.HttpUtilPool;
+import com.fayuan.util.NetWorkException;
 import org.apache.log4j.Logger;
 import org.htmlparser.util.ParserException;
 
@@ -44,15 +44,11 @@ public class PageHandler implements Runnable {
 
     @Override
     public void run() {
-        work();
-    }
-
-    public void work() {
         try {
             int sameNum = 0;
             int sucessNum = 0;
             this.httpUtil = httpUtilPool.getHttpUtil();
-            String html = dishonestyService.getPageHtml(name,cardNum,areaCode,pageNum,httpUtil);
+            String html = dishonestyService.getPageHtml(name, cardNum, areaCode, pageNum, httpUtil);
             List arrayList = dishonestyService.getPageList(html);
             for (int j = 0; j < arrayList.size(); j++) {
                 String saveid = arrayList.get(j).toString();
@@ -65,7 +61,7 @@ public class PageHandler implements Runnable {
                     sameNum++;
                     continue;
                 } else {
-                    int num = dishonestyService.saveDishoney(arrayList.get(j).toString(), cardNum, areaCode,httpUtil);
+                    int num = dishonestyService.saveDishoney(arrayList.get(j).toString(), cardNum, httpUtil);
                     if (num == 0) {
                         sameNum++;
                     } else {
@@ -73,7 +69,6 @@ public class PageHandler implements Runnable {
                     }
                 }
             }
-            httpUtilPool.returnHttpUtil(httpUtil);
             String logStr = "查询条件：" + cardNum + ",areacode:" + areaCode + ",当前页数：" + pageNum + "，总重复个数" + sameNum + ",总成功个数：" + sucessNum + ",查询入库完成,idList:" + arrayList + ",代理地址：" + httpUtil.getProxyURL();
             logger.info(logStr);
             String sql = "select * from cred_dishonesty_pagelog where cardnum ='" + cardNum + "' and pagenum = '" + pageNum + "' and areacode = '" + areaCode + "'";

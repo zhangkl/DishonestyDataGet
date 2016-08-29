@@ -1,4 +1,4 @@
-package com.dishonest.util;
+package com.fayuan.util;
 
 /**
  * Created with IntelliJ IDEA.

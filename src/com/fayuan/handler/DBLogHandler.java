@@ -1,8 +1,8 @@
-package com.dishonest.handler;
+package com.fayuan.handler;
 
-import com.dishonest.util.GetDateException;
-import com.dishonest.util.HttpUtil;
-import com.dishonest.util.NetWorkException;
+import com.fayuan.util.GetDateException;
+import com.fayuan.util.HttpUtil;
+import com.fayuan.util.NetWorkException;
 import org.apache.log4j.Logger;
 import org.htmlparser.util.ParserException;
 
@@ -18,11 +18,11 @@ public class DBLogHandler implements Runnable {
 
     Logger logger = Logger.getLogger(DBLogHandler.class);
 
-    String cardNum;
-    HttpUtil httpUtil;
-    String areacode;
     String name;
+    String cardNum;
+    String areacode;
     String pagenum;
+    HttpUtil httpUtil;
     int dataType;
 
 

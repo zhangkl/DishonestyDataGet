@@ -6,10 +6,10 @@
  * Vestibulum commodo. Ut rhoncus gravida arcu.
  ******************************************************************************/
 
-package com.dishonest.handler;
+package com.fayuan.handler;
 
-import com.dishonest.dao.ConnUtil;
-import com.dishonest.util.HttpUtil;
+import com.fayuan.dao.ConnUtil;
+import com.fayuan.util.HttpUtil;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
@@ -99,6 +99,12 @@ public class ProxyHandler implements Runnable {
         }
     }
 
+    /**
+     * 抓取 有代理  网站的免费代理入库
+     * @param url
+     * @throws ParserException
+     * @throws SQLException
+     */
     public void getProxy(String url) throws ParserException, SQLException {
         Parser parser = new Parser(url);
         parser.setEncoding("utf-8");
@@ -127,6 +133,11 @@ public class ProxyHandler implements Runnable {
 
     }
 
+    /**
+     * 测试代理连通性
+     * @param url
+     * @throws SQLException
+     */
     public void checkProxy(String url) throws SQLException {
         HttpGet httpRequest = new HttpGet(url);
 
@@ -151,6 +162,10 @@ public class ProxyHandler implements Runnable {
         }
     }
 
+    /**
+     * 获取网络状态
+     * @throws IOException
+     */
     public void getNetStatus() throws IOException {
         Process process = Runtime.getRuntime().exec("ping shixin.court.gov.cn -t");
         InputStreamReader isr = new InputStreamReader(process.getInputStream(), "GBK");

@@ -1,7 +1,7 @@
-package com.dishonest.handler;
+package com.fayuan.handler;
 
-import com.dishonest.dao.ConnUtil;
-import com.dishonest.util.*;
+import com.fayuan.dao.ConnUtil;
+import com.fayuan.util.*;
 import com.sun.xml.internal.messaging.saaj.util.ByteInputStream;
 import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
@@ -212,7 +212,7 @@ public class DishonestyService {
     }
 
 
-    public String getPageHtml(String name, String cardNum, String areaCode, String pageNum,HttpUtil httpUtil) throws InterruptedException, SQLException, IOException, ParserException, NetWorkException, GetDateException {
+    public String getPageHtml(String name, String cardNum, String areaCode, String pageNum, HttpUtil httpUtil) throws InterruptedException, SQLException, IOException, ParserException, NetWorkException, GetDateException {
         sendTime = 0;
         String code = httpUtil.getCode();
         if (code == null || "".equals(code)) {
@@ -226,7 +226,7 @@ public class DishonestyService {
         }
         if (s.contains("验证码错误")) {
             logger.info("验证码错误，回调本方法！" + httpUtil.getCode());
-            s = getPageHtml(name, cardNum, areaCode, pageNum,httpUtil);
+            s = getPageHtml(name, cardNum, areaCode, pageNum, httpUtil);
         }
         return s;
     }
@@ -234,9 +234,9 @@ public class DishonestyService {
     /**
      * 获取并存储具体失信人信息
      */
-    public int saveDishoney(String saveid, String cardNum, String areacode,HttpUtil httpUtil) throws InterruptedException, IOException, SQLException, NetWorkException, GetDateException {
+    public int saveDishoney(String saveid, String cardNum, HttpUtil httpUtil) throws InterruptedException, IOException, SQLException, NetWorkException, GetDateException {
         sendTime = 0;
-        String idInfo = "";
+        String idInfo;
         Map map = new HashMap();
         map.put("id", saveid);
         String code = httpUtil.getCode();
@@ -255,12 +255,12 @@ public class DishonestyService {
         try {
             json = JSONObject.fromObject(idInfo);
         } catch (JSONException jsonex) {
-            return saveDishoney(saveid, cardNum, areacode,httpUtil);
+            return saveDishoney(saveid, cardNum, httpUtil);
         }
         if (json == null) {
             logger.error("json为空：" + idInfo);
             changeProxy(httpUtil);
-            return saveDishoney(saveid, cardNum, areacode,httpUtil);
+            return saveDishoney(saveid, cardNum, httpUtil);
         }
         Integer iid = json.optInt("id");
         String siname = json.optString("iname");
@@ -377,9 +377,9 @@ public class DishonestyService {
      * @throws SQLException
      * @throws IOException
      */
-    public String saveLastCount(String s, String cardNum, String areacode) throws InterruptedException, SQLException, IOException, ParserException {
+    public String saveLastCount(String s, String cardNum, String areaCode) throws InterruptedException, SQLException, IOException, ParserException {
         String account = getPageAccount(s);
-        String sql = "update cred_dishonesty_log set allcount = '" + account + "',dcurrentdate = sysdate where cardnum = '" + cardNum + "' and areacode = '" + areacode + "'";
+        String sql = "update cred_dishonesty_log set allcount = '" + account + "',dcurrentdate = sysdate where cardnum = '" + cardNum + "' and areacode = '" + areaCode + "'";
         connUtil.executeSaveOrUpdate(sql);
         return account;
     }
@@ -392,9 +392,9 @@ public class DishonestyService {
      * @throws SQLException
      * @throws IOException
      */
-    public int saveLastMaxPageNum(String s, String cardNum, String areacode) throws InterruptedException, SQLException, IOException, ParserException {
+    public int saveLastMaxPageNum(String s, String cardNum, String areaCode) throws InterruptedException, SQLException, IOException, ParserException {
         int maxPageNum = getMaxPage(s);
-        String sql = "update cred_dishonesty_log set endpage = '" + maxPageNum + "' where cardnum = '" + cardNum + "' and areacode = '" + areacode + "'";
+        String sql = "update cred_dishonesty_log set endpage = '" + maxPageNum + "' where cardnum = '" + cardNum + "' and areacode = '" + areaCode + "'";
         connUtil.executeSaveOrUpdate(sql);
         return maxPageNum;
     }

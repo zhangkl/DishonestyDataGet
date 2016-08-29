@@ -1,13 +1,11 @@
-package com.dishonest.handler;
+package com.fayuan.handler;
 
-import com.Main;
-import com.dishonest.dao.ConnUtil;
-import com.dishonest.util.HttpUtilPool;
+import com.fayuan.Main;
+import com.fayuan.util.HttpUtilPool;
 import org.apache.log4j.Logger;
 
 import java.sql.SQLException;
 import java.util.Calendar;
-import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 
 /**
@@ -31,12 +29,8 @@ public class HelpBatch implements Runnable {
     }
 
     public void getHttpPoolStatus() throws InterruptedException, SQLException {
-        Calendar calender = Calendar.getInstance();
-        if (calender.get(Calendar.HOUR_OF_DAY) != 11) {
-            Main.timeFlag = true;
-        } else {
-            Main.timeFlag = false;
-        }
+        logger.info(queue.size());
+        httpUtilPool.getStatus();
     }
 
     public static void main(String[] args) throws InterruptedException, SQLException {

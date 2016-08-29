@@ -7,7 +7,7 @@
  * Vestibulum commodo. Ut rhoncus gravida arcu.
  ******************************************************************************/
 
-package com.dishonest.dao;
+package com.fayuan.dao;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -32,6 +32,11 @@ public class ConnectionPool {
         initializePool(props, initialConnections);
     }
 
+    /**
+     * 增加了获取次数，等待时间以及获取不到的异常抛出功能
+     * @return
+     * @throws SQLException
+     */
     public Connection getConnection() throws SQLException {
         Connection con = null;
 

@@ -6,7 +6,7 @@
  * Vestibulum commodo. Ut rhoncus gravida arcu.
  ******************************************************************************/
 
-package com.dishonest.dao;
+package com.fayuan.dao;
 
 
 import java.io.StringReader;
@@ -27,7 +27,10 @@ public class ConnUtil {
     String thePw = "cred";
     ConnectionPool conPool;
 
-    //初始化连接
+    /**
+     * 初始化连接
+     * 增加修改了单例模式 ，初始化链接的时候创建ConnectionPool
+     */
     private ConnUtil() {
         try {
             conPool = new ConnectionPool("oracle.jdbc.driver.OracleDriver", dbUrl, theUser, thePw, 50);
@@ -42,28 +45,6 @@ public class ConnUtil {
 
     public static void main(String[] args) throws SQLException {
         Map map = ConnUtil.getInstance().executeQueryForMap("select * from cred_dishonesty_proxy where isusered = 1");
-    }
-
-    public Statement creatStatement() {
-        Statement statement = null;
-        try {
-            Connection connection = conPool.getConnection();
-            statement = connection.createStatement();
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return statement;
-    }
-
-    public PreparedStatement creatPStatement(String sql) {
-        PreparedStatement ps = null;
-        try {
-            Connection connection = conPool.getConnection();
-            ps = connection.prepareStatement(sql);
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return ps;
     }
 
     //执行查询
@@ -97,14 +78,14 @@ public class ConnUtil {
         return list;
     }
 
-    //执行查询
+    //执行查询返回单条数据
     public Map executeQueryForMap(String sql) throws SQLException {
         List  list = this.executeQueryForList(sql);
         Map rowData = (Map) list.get(0);
         return rowData;
     }
 
-    //执行查询
+    //插入数据
     public void psAdd(String sql, List list) throws SQLException {
         PreparedStatement ps = null;
         Connection connection = null;
@@ -132,6 +113,9 @@ public class ConnUtil {
         }
     }
 
+    /**
+     * 拼接sql直接保存或者更新数据
+     */
     public boolean executeSaveOrUpdate(String sql) throws SQLException {
         Statement statement = null;
         Connection connection = null;

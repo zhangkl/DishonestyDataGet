@@ -8,24 +8,12 @@
 
 package com.baidu.handler;
 
-import com.baidu.GetData;
-import com.baidu.httpUtil.HttpRespons;
-import com.baidu.httpUtil.TestHttp;
-import com.fayuan.dao.ConnUtil;
-import net.sf.json.JSONArray;
-import net.sf.json.JSONObject;
-import org.apache.log4j.Logger;
 
+import com.fayuan.dao.ConnUtil;
+import org.apache.log4j.Logger;
 import java.io.IOException;
 import java.net.URLDecoder;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Statement;
-import java.sql.Timestamp;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Created with IntelliJ IDEA.

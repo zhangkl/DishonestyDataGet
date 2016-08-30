@@ -53,7 +53,7 @@ public class MainForLess {
             } else {
                 name = "__";
             }
-            PageHandler pageHandler = new PageHandler(name, cardNum, areacode, pageNum, null, httpUtilPool, service, dateType);
+            PageHandler pageHandler = new PageHandler(name, cardNum, areacode, pageNum, null, httpUtilPool, dateType);
             executorService.execute(pageHandler);
         }
         executorService.shutdown();

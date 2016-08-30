@@ -1,7 +1,6 @@
 package com.fayuan;
 
 import com.fayuan.handler.DishonestyService;
-import com.fayuan.handler.HelpBatch;
 import com.fayuan.handler.PageHandler;
 import com.fayuan.util.GetDateException;
 import com.fayuan.util.HttpUtilPool;
@@ -26,8 +25,7 @@ public class Main implements Runnable {
     public static boolean timeFlag = true;
 
 
-
-    public Main(int threadPoolSize, String hostName, HttpUtilPool httpUtilPool, int sqlPageNum,int dataType) {
+    public Main(int threadPoolSize, String hostName, HttpUtilPool httpUtilPool, int sqlPageNum, int dataType) {
         this.threadPoolSize = threadPoolSize;
         this.hostName = hostName;
         this.httpUtilPool = httpUtilPool;
@@ -37,17 +35,15 @@ public class Main implements Runnable {
 
 
     public static void main(String[] args) throws SQLException, InterruptedException, HttpException, GetDateException, ExecutionException {
-        ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
+        int dataType = 2;
+        /*ScheduledExecutorService ses = Executors.newScheduledThreadPool(1);
         HelpBatch helpBatch = new HelpBatch();
-        ses.scheduleAtFixedRate(helpBatch, 0, 10, TimeUnit.MINUTES);
-        int pageNum = 0;
-        for (int i = 0; i < 6; i++) {
-            pageNum++;
-            HttpUtilPool httpUtilPool = new HttpUtilPool(5);
-            Main main = new Main(5, System.getenv("COMPUTERNAME"), httpUtilPool, pageNum,1);
-            Thread thread = new Thread(main);
-            thread.start();
-        }
+        ses.scheduleAtFixedRate(helpBatch, 0, 10, TimeUnit.MINUTES);*/
+
+        HttpUtilPool httpUtilPool = new HttpUtilPool(1);
+        Main main = new Main(1, "", httpUtilPool, 0, dataType);
+        Thread thread = new Thread(main);
+        thread.start();
     }
 
     public void run() {
@@ -55,12 +51,19 @@ public class Main implements Runnable {
             try {
                 BlockingQueue<Runnable> queue = new ArrayBlockingQueue<Runnable>(150);
                 ExecutorService threadPool = new ThreadPoolExecutor(threadPoolSize, threadPoolSize, 0L, TimeUnit.MILLISECONDS, queue);
-
                 DishonestyService service = new DishonestyService();
-                String querySql = " select nvl(c,0), l.cardnum, l.endpage " +
-                        " from (select count(*) c, t.cardnum from cred_dishonesty_pagelog t" +
-                        " group by cardnum) r right join cred_dishonesty_log l " +
-                        "on r.cardnum = l.cardnum where (c < to_number(l.endpage) or c is null) and l.cardnum not like '________-_' ";
+                String querySql ;
+                if (dataType == 1) {
+                    querySql = " select nvl(c,0), l.cardnum, l.endpage,l.areacode " +
+                            " from (select count(*) c, t.cardnum from cred_dishonesty_pagelog t" +
+                            " group by cardnum) r right join cred_dishonesty_log l " +
+                            "on r.cardnum = l.cardnum where (c < to_number(l.endpage) or c is null)  and l.cardnum != '_________' ";
+                } else {
+                    querySql = " select nvl(c,0), l.cardnum, l.endpage, l.areacode " +
+                            " from (select count(*) c, t.areacode from cred_dishonesty_pagelog t" +
+                            " group by areacode) r right join cred_dishonesty_log l " +
+                            "on r.areacode = l.areacode where (c < to_number(l.endpage) or c is null) and l.cardnum = '_________'";
+                }
                 if (hostName == null) {
                     querySql += " and l.hostname is null ";
                 } else if (!"".equals(hostName)) {
@@ -69,7 +72,7 @@ public class Main implements Runnable {
                 querySql += " order by nvl(c,0) desc";
                 List list;
                 if (sqlPageNum > 0) {
-                    list = service.getExeListForPage(querySql, sqlPageNum, 1);
+                    list = service.getExeListForPage(querySql, sqlPageNum, 10);
                 } else {
                     list = service.getExeList(querySql);
                 }
@@ -83,27 +86,26 @@ public class Main implements Runnable {
                     int startpage = 1;
                     for (int i = startpage; i <= endpage; i++) {
                         String pageNum = i + "";
-                        String sql = "select * from cred_dishonesty_pagelog where cardnum ='" + cardNum + "' and pagenum = '" + pageNum + "'";
+                        String sql = "select * from cred_dishonesty_pagelog where cardnum ='" + cardNum + "' and pagenum = '" + pageNum + "' and areacode = '" + areacode + "'";
                         List pagelist = service.getExeList(sql);
                         if (pagelist != null && pagelist.size() > 0) {
                             continue;
                         }
-                        String name ;
-                        if(dataType == 1){
+                        String name;
+                        if (dataType == 1) {
                             name = "__";
-                        } else{
+                        } else {
                             name = "____";
                         }
-                        PageHandler pageHandler = new PageHandler(name, cardNum,areacode,pageNum,hostName, httpUtilPool, service,dataType);
+                        PageHandler pageHandler = new PageHandler(name, cardNum, areacode, pageNum, hostName, httpUtilPool, dataType);
                         threadPool.execute(pageHandler);
                         if (queue.size() > 100) {
                             Thread.currentThread().sleep(1000 * 60 * 1);
-                            logger.info("开始执行：queueSize" + queue.size()+",cardNum:"+cardNum+",pageNum"+pageNum);
+                            logger.info("开始执行：queueSize:" + queue.size() + ",cardNum:" + cardNum + ",pageNum" + pageNum);
                         }
                     }
                 }
                 threadPool.shutdown();
-
             } catch (InterruptedException e) {
                 e.printStackTrace();
             } catch (SQLException e) {

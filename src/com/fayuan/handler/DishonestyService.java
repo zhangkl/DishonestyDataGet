@@ -217,10 +217,12 @@ public class DishonestyService {
         String code = httpUtil.getCode();
         if (code == null || "".equals(code)) {
             code = getImageCode(httpUtil);
+            httpUtil.setCode(code);
         }
         String s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", name, "pCardNum", cardNum, "pProvince", areaCode, "currentPage", pageNum, "pCode", code);
         while (sendTime < maxTime && s.contains("验证码错误")) {
             code = getImageCode(httpUtil);
+            httpUtil.setCode(code);
             s = httpUtil.doPostString("http://shixin.court.gov.cn/findd", "pName", name, "pCardNum", cardNum, "pProvince", areaCode, "currentPage", pageNum, "pCode", code);
             sendTime++;
         }

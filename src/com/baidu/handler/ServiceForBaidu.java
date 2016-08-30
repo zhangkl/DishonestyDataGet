@@ -26,6 +26,13 @@ public class ServiceForBaidu {
     int sameAccount;
     int sucessCount;
 
+
+    /**
+     * 根据seq名字获取序列
+     * @param seqName
+     * @return
+     * @throws SQLException
+     */
     public static synchronized int getSeqNextVal(String seqName) throws SQLException {
         Map newrs;
         int id = 0;
@@ -40,6 +47,12 @@ public class ServiceForBaidu {
         return id;
     }
 
+    /**
+     * 获取总条数
+     * @param json
+     * @return
+     * @throws IOException
+     */
     public int getAccount(String json) throws IOException {
         JSONObject jsonObject = JSONObject.fromObject(json);
         JSONArray jsonArray = JSONArray.fromObject(jsonObject.get("data"));
@@ -52,7 +65,14 @@ public class ServiceForBaidu {
         return 0;
     }
 
-    public String getData(String cardNum, String areaName) {
+    /**
+     * 按指定参数直接请求百度链接，获取数据
+     * @param cardNum
+     * @param areaName
+     * @param pn
+     * @return
+     */
+    public String getData(String cardNum, String areaName,String pn) {
         Map map = new HashMap();
         map.put("resource_id", "6899");
         map.put("query", "%E5%A4%B1%E4%BF%A1%E8%A2%AB%E6%89%A7%E8%A1%8C%E4%BA%BA%E5%90%8D%E5%8D%95");
@@ -61,6 +81,7 @@ public class ServiceForBaidu {
         map.put("format", "json");
         map.put("cardNum", cardNum);
         map.put("areaName", areaName);
+        map.put("pn", pn);
         String url = BaiduEnum.URL.toString();
         String jsonString = null;
         try {
@@ -75,6 +96,11 @@ public class ServiceForBaidu {
         return jsonString;
     }
 
+    /**
+     * 轮询在start和end范围内的证件号码，轮询所有页数查询
+     * @param start
+     * @param end
+     */
     public void getData(int start, int end) {
         try {
             Map map = new HashMap();
@@ -127,6 +153,11 @@ public class ServiceForBaidu {
         }
     }
 
+    /**
+     * 处理返回的json数据并入库
+     * @param json
+     * @throws IOException
+     */
     public void json2Model(String json) throws IOException {
         JSONObject jsonObject = JSONObject.fromObject(json);
         String sqlStr = "";

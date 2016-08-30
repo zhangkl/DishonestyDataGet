@@ -26,28 +26,27 @@ public class PageHandler implements Runnable {
     String areaCode;
     String pageNum;
     String hostName;
-    HttpUtil httpUtil;
     HttpUtilPool httpUtilPool;
-    DishonestyService dishonestyService;
     int dataType;//数据类型  1为个人 2为企业
-
-    public PageHandler(String name, String cardNum, String areaCode, String pageNum, String hostName, HttpUtilPool httpUtilPool, DishonestyService dishonestyService, int dataType) {
+    public PageHandler(String name, String cardNum, String areaCode, String pageNum, String hostName, HttpUtilPool httpUtilPool, int dataType) {
         this.name = name;
         this.cardNum = cardNum;
         this.areaCode = areaCode;
         this.pageNum = pageNum;
         this.hostName = hostName;
         this.httpUtilPool = httpUtilPool;
-        this.dishonestyService = dishonestyService;
         this.dataType = dataType;
     }
 
+
     @Override
     public void run() {
+        int sameNum = 0;
+        int sucessNum = 0;
+        HttpUtil httpUtil = null;
         try {
-            int sameNum = 0;
-            int sucessNum = 0;
-            this.httpUtil = httpUtilPool.getHttpUtil();
+            DishonestyService dishonestyService = new DishonestyService();
+            httpUtil = httpUtilPool.getHttpUtil();
             String html = dishonestyService.getPageHtml(name, cardNum, areaCode, pageNum, httpUtil);
             List arrayList = dishonestyService.getPageList(html);
             for (int j = 0; j < arrayList.size(); j++) {

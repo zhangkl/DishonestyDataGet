@@ -274,7 +274,6 @@ public class HttpUtil {
                 getCookies(httpResponse);
                 HttpEntity entity = httpResponse.getEntity();
                 Object result = EntityUtils.toString(entity, getcharset(httpResponse));
-                httpRequest.abort();
                 return result;
             } else {
                 throw new NetWorkException("url:" + url + " ,doPost请求响应码：" + httpResponse.getStatusLine().getStatusCode());

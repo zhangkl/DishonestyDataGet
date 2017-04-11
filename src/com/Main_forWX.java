@@ -22,7 +22,7 @@ public class Main_forWX {
             HttpUtil httpUtil = new HttpUtil(true, proxUrl);
             System.out.println(proxUrl);
             String netResult = httpUtil.doGetString(url, null);
-            System.out.println(netResult);
+            /*System.out.println(netResult);
             String ajaxResult = httpUtil.doPostString(url, "t", "498", "ajax", "a", "id", "20211", "uid", "478");
             System.out.println(ajaxResult);
             if ("succ".equals(ajaxResult)) {
@@ -30,7 +30,7 @@ public class Main_forWX {
                 System.out.println("成功" + sucCount);
             } else {
                 continue;
-            }
+            }*/
         }
         System.out.println("执行结束，目前成功个数：" + sucCount);
     }

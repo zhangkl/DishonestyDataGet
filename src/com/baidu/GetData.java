@@ -13,7 +13,6 @@ import com.baidu.handler.Dishonesty_ENT;
 import com.baidu.handler.Dishonesty_Person;
 import org.apache.log4j.Logger;
 
-import java.io.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -49,6 +48,4 @@ public class GetData {
             logger.error("", e);
         }
     }
-
-
 }

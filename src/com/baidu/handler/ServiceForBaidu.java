@@ -69,9 +69,10 @@ public class ServiceForBaidu {
      * 按指定参数直接请求百度链接，获取数据
      * @param cardNum
      * @param areaName
+     * @param pn
      * @return
      */
-    public String getData(String cardNum, String areaName) {
+    public String getData(String cardNum, String areaName,String pn) {
         Map map = new HashMap();
         map.put("resource_id", "6899");
         map.put("query", "%E5%A4%B1%E4%BF%A1%E8%A2%AB%E6%89%A7%E8%A1%8C%E4%BA%BA%E5%90%8D%E5%8D%95");
@@ -80,6 +81,7 @@ public class ServiceForBaidu {
         map.put("format", "json");
         map.put("cardNum", cardNum);
         map.put("areaName", areaName);
+        map.put("pn", pn);
         String url = BaiduEnum.URL.toString();
         String jsonString = null;
         try {

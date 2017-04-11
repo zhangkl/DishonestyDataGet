@@ -9,7 +9,6 @@
 package com.dishonest.util;
 
 
-import com.dishonest.handler.CardHandler;
 import org.apache.http.*;
 import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
@@ -21,8 +20,10 @@ import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.apache.http.util.EntityUtils;
+import org.apache.log4j.Logger;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.*;
 
 /**
@@ -33,6 +34,9 @@ import java.util.*;
  * To change this template use File | Settings | File Templates.
  */
 public class HttpUtil {
+
+    Logger logger = Logger.getLogger(HttpUtil.class);
+
     boolean isProxy = false;
     String proxyURL;
     int proxyPort;
@@ -40,7 +44,34 @@ public class HttpUtil {
     private String cookies = null;
     private HttpClient httpClient;
     private int sendTimes = 0;
-    private int maxTimes = 0;
+    private int maxTimes = 3;
+
+    private String code;
+
+    public HashMap<String, String> getMapCookies() {
+        return mapCookies;
+    }
+
+    public void setMapCookies(HashMap<String, String> mapCookies) {
+        this.mapCookies = mapCookies;
+    }
+
+    public String getCookies() {
+        return cookies;
+    }
+
+    public void setCookies(String cookies) {
+        this.cookies = cookies;
+    }
+
+    public String getCode() {
+
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
 
     public HttpUtil(boolean isProxy, String proxyURL) {
         this.isProxy = isProxy;
@@ -48,6 +79,7 @@ public class HttpUtil {
         this.proxyPort = Integer.parseInt(proxyURL.split(":")[1]);
         httpClient = HttpClients.createDefault();
     }
+
     public HttpUtil() {
         httpClient = HttpClients.createDefault();
     }
@@ -56,56 +88,95 @@ public class HttpUtil {
         return proxyURL + ":" + proxyPort;
     }
 
+    public boolean isProxy() {
+        return isProxy;
+    }
+
     public void setProxyURL(String proxyURL) {
         this.proxyURL = proxyURL.split(":")[0];
         this.proxyPort = Integer.parseInt(proxyURL.split(":")[1]);
     }
 
-    public HttpUtil clone() {
+    /*public HttpUtil clone() {
         HttpUtil instance = new HttpUtil();
         instance.mapCookies = this.mapCookies;
         instance.cookies = this.cookies;
+        instance.code = this.code;
         return instance;
     }
 
     public void clone(HttpUtil instance) {
         this.mapCookies = instance.mapCookies;
         this.cookies = instance.cookies;
-    }
+    }*/
 
-    public String doGetString(String url, Map params) throws InterruptedException {
-        Object object;
-        do {
-            object = doGet(url, params);
-            sendTimes++;
-            if (object == null) {
-                System.out.println(Thread.currentThread().getName() + ":" + url + ":" + params + ",doGetByte获取错误次数" + sendTimes + ",线程休眠");
-            }
-        } while (sendTimes <= maxTimes && object == null);
+    public String doGetString(String url, Map params) throws InterruptedException, IOException, NetWorkException {
+        Object object = null;
         sendTimes = 0;
+        try {
+            object = doGet(url, params);
+        } catch (NetWorkException e) {
+            while (sendTimes < maxTimes && object == null) {
+                Thread.sleep(1000 * 5);
+                object = doGet(url, params);
+                sendTimes++;
+                if (object != null) {
+                    return object.toString();
+                }
+            }
+            throw e;
+        }
         return object.toString();
     }
 
-    public byte[] doGetByte(String url, Map params) throws InterruptedException, ClassCastException {
-        Object object;
-        do {
-            object = doGet(url, params);
-            sendTimes++;
-            if (object == null) {
-                System.out.println(Thread.currentThread().getName() + ":" + url + ":" + params + ",doGetByte获取错误次数" + sendTimes + ",线程休眠");
-            }
-        } while (sendTimes <= maxTimes && (object == null || object instanceof String));
+    public byte[] doGetByte(String url, Map params) throws InterruptedException, ClassCastException, IOException, NetWorkException {
         sendTimes = 0;
-        return (byte[]) object;
+        Object object = null;
+        try {
+            object = doGet(url, params);
+            while (sendTimes < maxTimes && (object == null || object instanceof String || ((byte[]) object).length == 0)) {
+                object = doGet(url, params);
+                sendTimes++;
+            }
+            return (byte[]) object;
+        } catch (NetWorkException e) {
+            logger.error(object, e);
+            throw e;
+        } catch (ClassCastException e) {
+            logger.error(object + ":" + sendTimes, e);
+            throw e;
+        }
     }
 
-    public Object doGet(String url, Map params) throws InterruptedException {
+    public String doPostString(String url, final Object... paramlist) throws InterruptedException, IOException, NetWorkException {
+        Map<String, Object> map = new HashMap<String, Object>();
+        for (int i = 0; i < paramlist.length / 2; i++) {
+            map.put(paramlist[i * 2].toString(), paramlist[i * 2 + 1]);
+        }
+        sendTimes = 0;
+        try {
+            Object object = doPost(url, map);
+            while (sendTimes <= maxTimes && object == null) {
+                Thread.sleep(1000 * 5);
+                object = doPost(url, map);
+                sendTimes++;
+                if (object != null) {
+                    return object.toString();
+                }
+            }
+            return object.toString();
+        } catch (NetWorkException e) {
+            throw e;
+        }
+    }
+
+    public Object doGet(String url, Map params) throws InterruptedException, IOException, NetWorkException {
         /* 建立HTTPGet对象 */
         String paramStr = "";
         if (params != null) {
-            Iterator iter = params.entrySet().iterator();
-            while (iter.hasNext()) {
-                Map.Entry entry = (Map.Entry) iter.next();
+            Iterator item = params.entrySet().iterator();
+            while (item.hasNext()) {
+                Map.Entry entry = (Map.Entry) item.next();
                 Object key = entry.getKey();
                 Object val = entry.getValue();
                 paramStr += paramStr = "&" + key + "=" + val;
@@ -117,15 +188,20 @@ public class HttpUtil {
             url += paramStr;
         }
         HttpGet httpRequest = new HttpGet(url);
-        RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(3000).setConnectionRequestTimeout(3000)
-                .setSocketTimeout(3000).build();
+        RequestConfig requestConfig = RequestConfig.custom().setConnectTimeout(30000).setConnectionRequestTimeout(30000)
+                .setSocketTimeout(30000)
+                .build();
         httpRequest.setConfig(requestConfig);
 
         if (isProxy) {
             // 依次是代理地址，代理端口号，协议类型
             HttpHost proxy = new HttpHost(proxyURL, proxyPort, "http");
-            RequestConfig config = RequestConfig.custom().setProxy(proxy).build();
+
+            RequestConfig config = RequestConfig.custom()
+                    .setProxy(proxy)
+                    .setConnectTimeout(1000 * 60)
+                    .setConnectionRequestTimeout(1000 * 60)
+                    .setSocketTimeout(1000 * 60).build();
             httpRequest.setConfig(config);
         }
 
@@ -133,7 +209,6 @@ public class HttpUtil {
         if (cookies != null) {
             httpRequest.setHeader("Cookie", cookies);
         }
-        String errorInfo = "请求错误:";
         try {
             /* 发送请求并等待响应 */
             HttpResponse httpResponse = httpClient.execute(httpRequest);
@@ -143,50 +218,37 @@ public class HttpUtil {
                 /* 读返回数据 */
                 getCookies(httpResponse);
                 HttpEntity entity = httpResponse.getEntity();
-                Object result = null;
+                Object result;
+                logger.info(entity.getContentType().getValue());
                 if (entity.getContentType().getValue().startsWith("image")) {
                     result = EntityUtils.toByteArray(entity);
                 } else {
                     result = EntityUtils.toString(entity, getcharset(httpResponse));
                 }
                 httpRequest.abort();
-                sendTimes = 0;
                 return result;
             } else {
-                errorInfo += Thread.currentThread().getName() + ":" + url + ",doGet请求响应码：" + httpResponse.getStatusLine().getStatusCode();
+                throw new NetWorkException("url:" + url + " ,doGet请求响应码：" + httpResponse.getStatusLine().getStatusCode());
             }
         } catch (ClientProtocolException e) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + ",调用doGet异常：" + e.getMessage();
+            logger.error(e.getMessage());
         } catch (IOException e) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + ",调用doGet异常：" + e.getMessage();
+            logger.error(e.getMessage());
+        } catch (NetWorkException e) {
+            logger.error(e.getMessage());
+            throw e;
+        } finally {
+            httpRequest.abort();
         }
-        httpRequest.abort();
-        return errorInfo;
+        return null;
     }
 
-    public String doPostString(String url, final Object... paramlist) throws InterruptedException {
-        Map<String, Object> map = new HashMap<String, Object>();
-        for (int i = 0; i < paramlist.length / 2; i++) {
-            map.put(paramlist[i * 2].toString(), paramlist[i * 2 + 1]);
-        }
-        Object object;
-        do {
-            object = doPost(url, map);
-            sendTimes++;
-            if (object == null) {
-                System.out.println(Thread.currentThread().getName() + ":" + url + ":" + map + ":doPost获取错误次数" + sendTimes + ",线程休眠");
-            }
-        } while (sendTimes <= maxTimes && object == null);
-        sendTimes = 0;
-        return object.toString();
-    }
-
-    private Object doPost(String url, Map map) throws InterruptedException {
+    private Object doPost(String url, Map map) throws InterruptedException, IOException, NetWorkException {
         /* 建立HTTPPost对象 */
         List<NameValuePair> params = new ArrayList<NameValuePair>();
         Iterator iter = map.keySet().iterator();
-        String key = "";
-        String value = null;
+        String key;
+        String value;
         while (iter.hasNext()) {
             key = (String) iter.next();
             value = (String) map.get(key);
@@ -195,24 +257,22 @@ public class HttpUtil {
 
         HttpPost httpRequest = new HttpPost(url);
         RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(3000).setConnectionRequestTimeout(3000)
-                .setSocketTimeout(3000).build();
+                .setConnectTimeout(30000).setConnectionRequestTimeout(30000)
+                .setSocketTimeout(30000).build();
         httpRequest.setConfig(requestConfig);
         if (isProxy) {
             // 依次是代理地址，代理端口号，协议类型
             HttpHost proxy = new HttpHost(proxyURL, proxyPort, "http");
-            RequestConfig config = RequestConfig.custom().setProxy(proxy).build();
+            RequestConfig config = RequestConfig.custom().setProxy(proxy)
+                    .setConnectTimeout(30000).setConnectionRequestTimeout(30000)
+                    .setSocketTimeout(30000).build();
             httpRequest.setConfig(config);
         }
 
         setHeader(httpRequest);
-        System.out.println(cookies);
         if (cookies != null) {
             httpRequest.setHeader("Cookie", cookies);
-        }else{
-            httpRequest.setHeader("Cookie", "idflag=20211; expires=Mon, 28-Nov-2016 05:20:08 GMT; path=/");
         }
-        String errorInfo = "请求错误";
         try {
             /* 添加请求参数到请求对象 */
             httpRequest.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
@@ -223,33 +283,37 @@ public class HttpUtil {
                 /* 读返回数据 */
                 getCookies(httpResponse);
                 HttpEntity entity = httpResponse.getEntity();
-                Object result = null;
-                if (entity.getContentType().getValue().startsWith("image")) {
-                    result = EntityUtils.toByteArray(entity);
-                } else {
-                    result = EntityUtils.toString(entity, getcharset(httpResponse));
-                }
+                Object result = EntityUtils.toString(entity, getcharset(httpResponse));
                 httpRequest.abort();
-                sendTimes = 0;
                 return result;
             } else {
-                errorInfo += Thread.currentThread().getName() + ":" + url + ":" + params + ",post请求响应码：" + httpResponse.getStatusLine().getStatusCode();
+                throw new NetWorkException("url:" + url + " ,doPost请求响应码：" + httpResponse.getStatusLine().getStatusCode());
             }
-
-        } catch (Exception exception) {
-            errorInfo += Thread.currentThread().getName() + ":" + url + ":" + params + ",调用doPost异常：" + exception.getMessage();
+        } catch (NetWorkException e) {
+            throw e;
+        } catch (UnsupportedEncodingException e) {
+            logger.error(e.getMessage());
+        } catch (ClientProtocolException e) {
+            logger.error(e.getMessage());
+        } catch (IOException e) {
+            logger.error(e.getMessage());
+        } finally {
+            httpRequest.abort();
         }
-        httpRequest.abort();
-        return errorInfo;
+        return null;
     }
 
-    //设置微信访问模式
     private void setHeader(HttpRequestBase http) {
-        http.setHeader("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.3.6; zh-cn; GT-S5660 Build/GINGERBREAD) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1 MicroMessenger/4.5.255");
+        http.setHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.106 Safari/537.36");
     }
 
     private void getCookies(HttpResponse response) {
         Header[] list = response.getHeaders("Set-Cookie");
+        if (list == null || list.length == 0) {
+            return;
+        } else {
+            //mapCookies.clear();
+        }
         for (Header header : list) {
             String value = header.getValue();
             String[] arrParams = value.split(";");
@@ -293,8 +357,9 @@ public class HttpUtil {
     }
 
     public static void main(String[] args) throws IOException, InterruptedException {
-        HttpUtil httpUtil = new HttpUtil(true,"120.52.72.21:80");
-        System.out.println(123123);
+        do {
+            HttpUtil httpUtil = new HttpUtil();
+        } while (true);
     }
 
 }

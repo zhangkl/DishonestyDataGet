@@ -40,7 +40,7 @@ public class HttpUtil {
     private String cookies = null;
     private HttpClient httpClient;
     private int sendTimes = 0;
-    private int maxTimes = 5;
+    private int maxTimes = 0;
 
     public HttpUtil(boolean isProxy, String proxyURL) {
         this.isProxy = isProxy;
@@ -80,7 +80,6 @@ public class HttpUtil {
             sendTimes++;
             if (object == null) {
                 System.out.println(Thread.currentThread().getName() + ":" + url + ":" + params + ",doGetByte获取错误次数" + sendTimes + ",线程休眠");
-                Thread.sleep(10000);
             }
         } while (sendTimes <= maxTimes && object == null);
         sendTimes = 0;
@@ -94,7 +93,6 @@ public class HttpUtil {
             sendTimes++;
             if (object == null) {
                 System.out.println(Thread.currentThread().getName() + ":" + url + ":" + params + ",doGetByte获取错误次数" + sendTimes + ",线程休眠");
-                Thread.sleep(10000);
             }
         } while (sendTimes <= maxTimes && (object == null || object instanceof String));
         sendTimes = 0;
@@ -120,8 +118,8 @@ public class HttpUtil {
         }
         HttpGet httpRequest = new HttpGet(url);
         RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(30000).setConnectionRequestTimeout(30000)
-                .setSocketTimeout(30000).build();
+                .setConnectTimeout(3000).setConnectionRequestTimeout(3000)
+                .setSocketTimeout(3000).build();
         httpRequest.setConfig(requestConfig);
 
         if (isProxy) {
@@ -135,7 +133,7 @@ public class HttpUtil {
         if (cookies != null) {
             httpRequest.setHeader("Cookie", cookies);
         }
-        String errorInfo = "验证码错误:";
+        String errorInfo = "请求错误:";
         try {
             /* 发送请求并等待响应 */
             HttpResponse httpResponse = httpClient.execute(httpRequest);
@@ -177,7 +175,6 @@ public class HttpUtil {
             sendTimes++;
             if (object == null) {
                 System.out.println(Thread.currentThread().getName() + ":" + url + ":" + map + ":doPost获取错误次数" + sendTimes + ",线程休眠");
-                Thread.sleep(10000);
             }
         } while (sendTimes <= maxTimes && object == null);
         sendTimes = 0;
@@ -198,8 +195,8 @@ public class HttpUtil {
 
         HttpPost httpRequest = new HttpPost(url);
         RequestConfig requestConfig = RequestConfig.custom()
-                .setConnectTimeout(30000).setConnectionRequestTimeout(30000)
-                .setSocketTimeout(30000).build();
+                .setConnectTimeout(3000).setConnectionRequestTimeout(3000)
+                .setSocketTimeout(3000).build();
         httpRequest.setConfig(requestConfig);
         if (isProxy) {
             // 依次是代理地址，代理端口号，协议类型
@@ -209,10 +206,13 @@ public class HttpUtil {
         }
 
         setHeader(httpRequest);
+        System.out.println(cookies);
         if (cookies != null) {
             httpRequest.setHeader("Cookie", cookies);
+        }else{
+            httpRequest.setHeader("Cookie", "idflag=20211; expires=Mon, 28-Nov-2016 05:20:08 GMT; path=/");
         }
-        String errorInfo = "验证码错误";
+        String errorInfo = "请求错误";
         try {
             /* 添加请求参数到请求对象 */
             httpRequest.setEntity(new UrlEncodedFormEntity(params, "UTF-8"));
@@ -243,8 +243,9 @@ public class HttpUtil {
         return errorInfo;
     }
 
+    //设置微信访问模式
     private void setHeader(HttpRequestBase http) {
-        http.setHeader("User-Agent", "Mozilla/5.0 (Windows; U; Windows NT 6.1; en-US; rv:1.9.1.6) Gecko/20091201 Firefox/3.5.6");
+        http.setHeader("User-Agent", "Mozilla/5.0 (Linux; U; Android 2.3.6; zh-cn; GT-S5660 Build/GINGERBREAD) AppleWebKit/533.1 (KHTML, like Gecko) Version/4.0 Mobile Safari/533.1 MicroMessenger/4.5.255");
     }
 
     private void getCookies(HttpResponse response) {
